@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# PyInstaller の出力と中間生成物
+build/
+dist/
+
+# 配布パッケージ（tools/build_release.py の出力）
+release/
+
+# 実行時に作られるもの
+obs_navi_config.json
+tests/_last_run.txt

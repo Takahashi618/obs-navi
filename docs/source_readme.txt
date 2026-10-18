@@ -1,0 +1,65 @@
+OBSナビ {VERSION} のソースコード
+
+このフォルダには、同梱の OBSナビ.exe を作ったソースコードが入っています。
+git のコミット {COMMIT} から取り出しました。
+OBSナビを使うだけなら、このフォルダは要りません。
+
+
+■ 著作権とライセンス
+
+Copyright (C) 2026 Takahashi
+
+OBSナビは GNU General Public License 第3版（GPL 第3版）で配布しています。
+全文はこのフォルダの LICENSE.txt にあります。
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, version 3 of the License.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+for more details.
+
+
+■ フォルダの中身
+
+・README.md は、OBSナビの紹介と、ソースからの動かし方です。
+・app.py は、起動の入口です。
+・version.py は、版の番号です。
+・speech.py は、スクリーンリーダーへの読み上げです。
+・core フォルダは、OBS との通信と、画面に依存しない処理です。キーの定義は core\keymap.py にあります。
+・ui フォルダは、画面（wxPython）です。
+・tests フォルダは、テストです。
+・tools フォルダは、文書の生成と検査、配布パッケージの作成です。
+・docs フォルダは、マニュアルとテストのお願いの元の HTML です。
+・obs_navi.spec は、実行ファイルを作る設定（PyInstaller）です。
+
+
+■ 動かし方
+
+作者が確かめた環境は Windows 11 と Python {PYTHON_VERSION}（64ビット）です。
+使っている部品と、確かめた版は次のとおりです。
+
+{REQUIREMENTS}
+
+1. 部品を入れます。
+   {PIP_INSTALL}
+2. 起動します。
+   python -X utf8 app.py
+3. テストを走らせます（OBS は要りません）。
+   python -X utf8 tests\run_tests.py
+
+
+■ 実行ファイルの作り方
+
+1. PyInstaller を入れます。
+   python -m pip install {PYINSTALLER_PIN}
+2. OBSナビを終了してから、次を実行します（起動したままだと、読み上げ用の DLL が欠けたまま作られることがあります）。
+   python -X utf8 -m PyInstaller --noconfirm obs_navi.spec
+3. dist\OBSナビ\OBSナビ.exe ができます。
+
+配布用の zip は、python -X utf8 tools\build_release.py で作ります。
+
+
+以上です。
