@@ -27,6 +27,8 @@ OBS 本体でこれを決める場所は2つあり、どちらも目で見るチ
 """
 from __future__ import annotations
 
+from .i18n import tr
+
 # OBS の音声トラックの数（OBS 本体の表と同じ6本）
 TRACK_COUNT = 6
 TRACK_NUMBERS = tuple(range(1, TRACK_COUNT + 1))
@@ -39,9 +41,9 @@ REC_TRACKS_KEY = "RecTracks"
 # ★自動では当てない。どのソースがゲームの音かは名前からは決められない
 #   ので、案内（読み上げ）に使うだけ
 RECOMMENDED = (
-    ("ゲームや音楽の音", (1, 2)),
-    ("スクリーンリーダーの声", (1, 3)),
-    ("マイク", (1, 4)),
+    (tr("ゲームや音楽の音", "Game and music audio"), (1, 2)),
+    (tr("スクリーンリーダーの声", "Screen reader voice"), (1, 3)),
+    (tr("マイク", "Microphone"), (1, 4)),
 )
 
 
@@ -109,12 +111,12 @@ def track_list_text(states) -> str:
     if not nums:
         return ""
     if len(nums) == 1:
-        return f"トラック{nums[0]}"
+        return tr(f"トラック{nums[0]}", f"track {nums[0]}")
     if len(nums) == 2:
-        return f"トラック{nums[0]}と{nums[1]}"
+        return tr(f"トラック{nums[0]}と{nums[1]}", f"tracks {nums[0]} and {nums[1]}")
     if nums == list(range(nums[0], nums[-1] + 1)):
-        return f"トラック{nums[0]}から{nums[-1]}"
-    return "トラック" + "、".join(str(n) for n in nums)
+        return tr(f"トラック{nums[0]}から{nums[-1]}", f"tracks {nums[0]} to {nums[-1]}")
+    return tr("トラック", "tracks ") + tr("、", ", ").join(str(n) for n in nums)
 
 
 def unrecorded_inputs(input_tracks: dict, recorded) -> list[str]:
@@ -141,7 +143,8 @@ def simple_mode_note(section: str, rec_quality: str) -> str:
     録画は配信と同じ音（1本）になり、RecTracks は使われない。
     """
     if section == "SimpleOutput" and str(rec_quality or "") == "Stream":
-        return ("出力モードが基本で、録画品質が配信と同じなので、"
-                "録画のトラックの設定は効きません。OBS本体の設定の出力で、"
-                "出力モードを詳細にするか、録画品質を配信と同じ以外にしてください")
+        return (tr("出力モードが基本で、録画品質が配信と同じなので、"
+                   "録画のトラックの設定は効きません。OBS本体の設定の出力で、"
+                   "出力モードを詳細にするか、録画品質を配信と同じ以外にしてください",
+           "The output mode is Simple and the recording quality is Same as stream, so the recording track settings have no effect. In OBS Settings, Output, set the output mode to Advanced, or set the recording quality to something other than Same as stream"))
     return ""

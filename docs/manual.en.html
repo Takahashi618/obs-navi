@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OBS Navi 0.20.1 Manual</title>
+<style>
+:root { color-scheme: light dark; }
+body {
+  font-family: "Segoe UI", sans-serif;
+  line-height: 1.7;
+  max-width: 52em;
+  margin: 0 auto;
+  padding: 1em 16px 3em;
+}
+h1 { font-size: 1.6em; }
+h2 { margin-top: 2.2em; border-bottom: 1px solid #888; }
+h3 { margin-top: 1.6em; }
+table { border-collapse: collapse; width: 100%; margin: 0.5em 0 1em; }
+th, td { border: 1px solid #888; padding: 0.3em 0.5em; text-align: left; vertical-align: top; }
+.box { border: 2px solid #888; border-radius: 4px; padding: 0.2em 1em; margin: 1em 0; }
+dt { font-weight: bold; margin-top: 0.8em; }
+code { font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+<h1>OBS Navi <span class="version">0.20.1</span> Manual</h1>
+
+<p>Author: Takahashi. This is the English edition of the manual.</p>
+<p>OBS Navi is a tool for operating OBS Studio with a screen reader (NVDA or PC-Talker). Each chapter has a heading, so you can move through this document by headings.</p>
+
+<nav aria-label="Contents">
+<h2 id="toc">Contents</h2>
+<p>There are 17 chapters.</p>
+<ol>
+<li><a href="#intro">Introduction</a></li>
+<li><a href="#requirements">Requirements</a></li>
+<li><a href="#setup">Setup and starting</a></li>
+<li><a href="#screen">The window</a></li>
+<li><a href="#basics">Basic operation</a></li>
+<li><a href="#output">Streaming and recording</a></li>
+<li><a href="#scenes">Scenes</a></li>
+<li><a href="#sources">Sources</a></li>
+<li><a href="#audio">Audio</a></li>
+<li><a href="#filters">Filters</a></li>
+<li><a href="#camera">Camera</a></li>
+<li><a href="#keys">Key list</a></li>
+<li><a href="#menus">Menu list</a></li>
+<li><a href="#config">Settings file</a></li>
+<li><a href="#trouble">Troubleshooting</a></li>
+<li><a href="#uninstall">Uninstalling</a></li>
+<li><a href="#license">License</a></li>
+</ol>
+</nav>
+
+<h2 id="intro">1. Introduction</h2>
+<p>Many parts of the OBS Studio window are hard or impossible to read and operate with a screen reader. OBS Navi operates OBS from its own window, which is designed to work well with speech.</p>
+<p>It uses WebSocket, which comes built into OBS Studio. Keep OBS running and use OBS Navi alongside it. OBS Navi also announces changes made in OBS itself (for example, when streaming starts or the scene changes).</p>
+
+<h3>What it can do</h3>
+<ul>
+<li>Start and stop streaming and recording, pause recording, add chapters (markers), save replays, and use the virtual camera</li>
+<li>Read the status (whether you are streaming or recording, and the current scene)</li>
+<li>Switch, create, configure, and delete scenes</li>
+<li>Show and hide sources; create, configure, and delete them; change their stacking order</li>
+<li>Game switch (point both the game video and the game audio to another game at once), video switch, and BGM playback</li>
+<li>Mute audio, change the volume (read in decibels), read levels (how loud the sound is right now), and set monitoring (whether you hear it yourself)</li>
+<li>Add, configure, and delete audio filters (such as noise suppression)</li>
+<li>Check whether cameras are running, and enable or disable them</li>
+<li>Send screen reader voices to the stream or keep them out of it</li>
+<li>Warn about silence and clipping while streaming or recording, and about low disk space while recording</li>
+<li>Keys that work even while you are in a game</li>
+<li>Show everything in English or Japanese (chosen automatically from the Windows display language, and changeable from the menu)</li>
+</ul>
+
+<h3>What it cannot do</h3>
+<ul>
+<li>Install OBS or set up where you stream (Twitch, YouTube, and so on). Enter your stream key and similar settings in OBS itself</li>
+<li>Create a YouTube broadcast. Use Manage Broadcast in OBS itself</li>
+<li>Add video filters (such as chroma key). You can check, turn on or off, and delete video filters that already exist</li>
+<li>Change the scene order in OBS itself. You can change the order inside OBS Navi</li>
+<li>Choose where monitoring is heard (which headphones). Set that in OBS itself</li>
+</ul>
+
+<h3>Made with AI</h3>
+<p>The program and this document were written with AI (Anthropic's Claude). The author decides what to build, how it should work, and whether it is easy to use with speech. The author uses it with a screen reader and has fixed it while checking. Its behavior is also checked with automated tests.</p>
+<p>About OBS Navi in the Help menu reads this out as well.</p>
+
+<h3 id="language">Display language</h3>
+<p>OBS Navi shows its window and speaks in English or Japanese. The first time, it follows the Windows display language: Japanese if Windows is in Japanese, otherwise English.</p>
+<p>To change it, choose <span lang="ja">表示の言語</span> (Language) in the Tools menu. This item is written in both Japanese and English so you can find it in either language. Choose one of Automatic, Japanese, or English. OBS Navi then asks whether to restart now; choose Yes to restart in the new language. If you choose No, the new language is used the next time you start OBS Navi.</p>
+<p>Names you create in OBS (scenes and sources) are not translated. The default source names that OBS Navi suggests (such as Game Capture and BGM Music) are chosen in the language in use when the settings file is first created.</p>
+
+<h2 id="requirements">2. Requirements</h2>
+<ul>
+<li>Windows 10 or Windows 11 (64-bit). Developed and tested on Windows 11</li>
+<li>OBS Studio 28 or later (the versions with WebSocket built in). Developed and tested with OBS Studio 32.2. Some features, such as chapters, do not work in older versions, so use a version that is as new as possible</li>
+<li>A screen reader: NVDA or PC-Talker</li>
+<li>No installation is needed, and no administrator rights are needed</li>
+</ul>
+
+<h2 id="setup">3. Setup and starting</h2>
+
+<h3 id="setup-obs">3.1 Enable the WebSocket server in OBS</h3>
+<p>OBS Navi connects to the WebSocket server in OBS. Do the following once, in OBS.</p>
+<ol>
+<li>Start OBS Studio.</li>
+<li>Press Alt+T to open the Tools menu, choose WebSocket Server Settings, and press Enter.</li>
+<li>Check the Enable WebSocket server check box.</li>
+<li>Make sure Enable Authentication is checked. If it is not, check it.</li>
+<li>If Server Password is empty, press Generate Password.</li>
+<li>Press OK to close.</li>
+</ol>
+<p>You do not need to copy the password. OBS Navi reads the password and port from the OBS settings file by itself. If authentication is off, OBS Navi does not connect (it never connects without a password).</p>
+
+<div class="box">
+<h4>If the OBS settings window is hard to use with speech</h4>
+<p>You can also edit the OBS settings file directly.</p>
+<ol>
+<li>Start OBS once, then exit it (the settings file is created the first time OBS starts).</li>
+<li>Open this file in Notepad: <code>%APPDATA%\obs-studio\plugin_config\obs-websocket\config.json</code></li>
+<li>Change false to true in <code>"server_enabled": false</code> and save the file. This is the only change needed.</li>
+<li>Start OBS.</li>
+</ol>
+</div>
+
+<h3 id="setup-place">3.2 Place OBS Navi</h3>
+<ol>
+<li>Select the zip file, press the Applications key, and choose Extract All.</li>
+<li>Put the extracted folder somewhere you can write to, such as Documents.</li>
+</ol>
+<p>Do not put it inside Program Files or similar places. OBS Navi creates its settings file (obs_navi_config.json) in its own folder. In a place where it cannot write, settings are not saved.</p>
+<p>All file and folder names in the package use only English letters, so they are not garbled. The program is OBSNavi.exe, and this manual is "Manual (English)". English documents end in (English), and Japanese documents end in (Japanese).</p>
+<p>Before extracting, if you open the zip file's Properties (Alt+Enter) and check Unblock on the General tab, the Windows warning in the next section will not appear.</p>
+
+<h3 id="setup-start">3.3 Start</h3>
+<ol>
+<li>Start OBS Studio first.</li>
+<li>Start OBSNavi.exe in the OBS Navi folder.</li>
+<li>First it reads "OBS Navi version <span class="version">0.20.1</span> status". This is the version of OBS Navi you started.</li>
+<li>If it then reads something like "Connected to OBS. Not streaming, Not recording, Current scene …", you are ready.</li>
+</ol>
+<p>If a "Windows protected your PC" screen appears, press Tab to move to More info and press Enter, then press Tab to move to the Run anyway button and press Enter. This appears because the app has no digital signature; it does not mean anything is wrong with this package.</p>
+<p>If you start OBS later, choose Reconnect to OBS in the Tools menu. If OBS exits first, OBS Navi reads "OBS has exited. Start OBS, then reconnect".</p>
+
+<h3 id="setup-exit">3.4 Exit</h3>
+<p>Press Alt+F4, or choose Exit in the Stream and Record menu. No confirmation appears.</p>
+<p>Escape does not exit. Escape closes settings dialogs, so OBS Navi is designed not to exit when you only meant to close a dialog.</p>
+<p>Exiting OBS Navi does not stop OBS, streaming, or recording.</p>
+
+<h2 id="screen">4. The window</h2>
+<p>The OBS Navi window has 6 fields. Tab moves through them from top to bottom (Shift+Tab moves backward). When OBS Navi starts, you are in the first field, the status.</p>
+<ol>
+<li><strong>Status</strong> (a read-only field). Its name is "OBS Navi version <span class="version">0.20.1</span> status". It holds the streaming and recording state and the current scene, or the reason if the connection failed.</li>
+<li><strong>Stream and record</strong> (a list with 4 items): Start streaming, Stop streaming, Start recording, and Stop recording. Choose with Up and Down Arrow and press Enter to run. Each item includes its key (for example, "Start streaming Ctrl+S").</li>
+<li><strong>Scene list</strong>. Enter switches to the selected scene. Selecting alone does not switch.</li>
+<li><strong>Source list</strong>. The sources in the scene selected in the scene list. Each row reads the name and whether it is shown, such as "Game Capture shown". Enter toggles between shown and hidden. If you select another scene in the scene list, you can check its contents without changing what is on air.</li>
+<li><strong>Audio input list</strong>. Sources that have audio. Each row reads the name, the mute state, and the volume, such as "Mic on plus 5 decibels" or "BGM muted 0 decibels". Enter toggles mute, and Left and Right Arrow change the volume.</li>
+<li><strong>Filter list</strong>. The filters of the source you selected last (in the source list or the audio input list). Rows read like "Noise Suppression on". Enter turns a filter on or off.</li>
+</ol>
+
+<h2 id="basics">5. Basic operation</h2>
+
+<h3>5.1 Lists and Enter</h3>
+<p>In every list, choose with Up and Down Arrow and press Enter to run. The same actions are also in the menu bar, so you can find them without remembering keys.</p>
+
+<h3>5.2 The Applications key menu</h3>
+<p>Press the Applications key in a list to show the actions available for that list. On keyboards without an Applications key, Shift+F10 does the same. Right after it opens, no item is selected, so press Down Arrow first, then press Enter to run. The first item is always the settings.</p>
+<p>Items that cannot be used right now are kept in place (they are read as unavailable). The items for each list are:</p>
+<!-- gen:popups -->
+<ul>
+<li>In the scene list: Scene settings, Create scene, Delete scene, Scene list order (4 items)</li>
+<li>In the source list: Source settings, Add filter, Create source, Delete source, Bring source forward (stacking order), Send source backward (stacking order), Source list order (7 items)</li>
+<li>In the audio input list: Source settings, Add filter, Enter volume as a number, Delete source, Level readout order, Read recording track assignment (6 items)</li>
+<li>In the filter list: Filter settings, Add filter, Delete filter (3 items)</li>
+</ul>
+<!-- /gen:popups -->
+
+<h3>5.3 The menu bar</h3>
+<p>Press Alt or F10 to open the menu bar. Left and Right Arrow choose a menu, Up and Down Arrow choose an item, and Enter runs it. If an item has a key, it is read after the item name. There are 8 menus, grouped by what they work on: Stream and Record, Scenes, Sources, Filters, Camera, Audio, Tools, and Help. All items are listed in <a href="#menus">chapter 13</a>.</p>
+
+<h3>5.4 Settings dialogs</h3>
+<p>Source, filter, and scene settings all use the same kind of dialog.</p>
+<ul>
+<li>You start in the Settings list. Each row has the form "item name, current value".</li>
+<li>Press Enter to change a value. On or off items switch right away; items with choices show a list; number and text items show an input box.</li>
+<li>Changes take effect in OBS immediately. There is no Save button.</li>
+<li>Tab moves to the buttons. Source settings have Reload, Open OBS properties, and Close. Filter settings have Reset to defaults, Reload, and Close. Scene settings have Reload and Close.</li>
+<li>Escape closes the dialog.</li>
+</ul>
+<p>For items this app cannot change, use Open OBS properties to open the OBS window and change them there.</p>
+
+<h3>5.5 Confirmation dialogs</h3>
+<p>A Confirm dialog appears before starting or stopping a stream, deleting something, and similar actions. The buttons are Yes and No, and No is selected at first. Enter alone does not run the action; press Tab to move to Yes, then press Enter. This prevents starting a stream or deleting a source by mistake.</p>
+
+<h2 id="output">6. Streaming and recording</h2>
+
+<h3>6.1 Start and stop</h3>
+<ul>
+<li>Ctrl+S starts streaming and Ctrl+Shift+S stops it. Both show a confirmation.</li>
+<li>Ctrl+R starts recording and Ctrl+Shift+R stops it. There is no confirmation.</li>
+<li>You can also use the Stream and record list in the window or the Stream and Record menu.</li>
+</ul>
+<p>Set your streaming service (Twitch, YouTube, and so on) and stream key in OBS itself beforehand.</p>
+<p>When streaming or recording starts, OBS Navi reads "Started streaming" or "Started recording". This is read when OBS reports it, so it is read the same way when you operate OBS itself. If you press start while already streaming, it reads "Already streaming" and does nothing.</p>
+<p>Starting and stopping are separate keys so that you do not stop a stream when you meant to start one because you were wrong about the current state.</p>
+
+<h3>6.2 Stream and record keys for use in games</h3>
+<p>These four keys work even while you are using a game or another app.</p>
+<ul>
+<li>Ctrl+Alt+Shift+F6 starts streaming (press twice in a row)</li>
+<li>Ctrl+Alt+Shift+F7 stops streaming (press twice in a row)</li>
+<li>Ctrl+Alt+Shift+F8 starts recording</li>
+<li>Ctrl+Alt+Shift+F9 stops recording</li>
+</ul>
+<p>The two streaming keys confirm by being pressed twice instead of showing a dialog. The first press reads "Press again to start streaming"; pressing again within 8 seconds runs it and reads "Start streaming, confirmed". Pressing another key in between cancels it. Holding the key down does not count as two presses. No dialog is shown so that you are not switched from the game to OBS Navi.</p>
+
+<h3>6.3 Pausing recording</h3>
+<p>Ctrl+P (the key that works anywhere is Ctrl+Alt+Shift+F5) pauses and resumes recording. The F5 status readout says "Recording paused" so you can tell. If recording stays paused, you are reminded every 5 minutes (the interval can be changed in the settings file).</p>
+
+<h3>6.4 Chapters</h3>
+<p>While recording, press Ctrl+Alt+Shift+F12 to add a chapter (a marker for finding the spot later) at that point. Chapters are named with a number and the time in the recording, like "01 00:12:34".</p>
+<p>Chapters can be added only when the recording format is Hybrid MP4 or Hybrid MOV. In OBS, go to Settings, Output, Recording Format, and choose "Hybrid MP4 (.mp4)" or "Hybrid MOV (.mov)". After changing it, you need to restart OBS.</p>
+<p>To find out whether chapters can be used now, choose Check recording settings in the Stream and Record menu. It reads one of "Chapters can be used", "Chapters can be used after restarting OBS", or "Chapters cannot be used with this format".</p>
+
+<h3>6.5 Recording files and checking settings</h3>
+<ul>
+<li>When you stop recording, it reads the file name: "Stopped recording. File …".</li>
+<li>Open last recording in the Stream and Record menu opens File Explorer with that file selected. If you have not recorded since OBS Navi started, it opens the recording folder.</li>
+<li>Check recording settings reads the folder, format, quality, encoder, recorded audio tracks, free space, and whether chapters can be used. It only reads; it does not change settings.</li>
+</ul>
+
+<h3>6.6 Saving replays and the virtual camera</h3>
+<p>Ctrl+Alt+F12 saves a replay (the last few tens of seconds). When saving finishes, it reads "Saved replay. File …".</p>
+<p>To use replays, turn on Enable Replay Buffer in OBS, Settings, Output. If the replay buffer is not running, OBS Navi starts it first. A replay cannot be saved right after starting, so wait a few tens of seconds and press the key again.</p>
+<p>Ctrl+Alt+F11 turns the virtual camera (which passes the OBS video to other apps) on and off.</p>
+
+<h3>6.7 Watching while streaming or recording</h3>
+<p>While streaming or recording, OBS Navi watches for the following three things and tells you.</p>
+<ul>
+<li>Silence: if an audio input is silent for 60 seconds in a row, it says something like "Mic has been silent for 60 seconds or more". Screen reader voice inputs are often silent, so they are not reported.</li>
+<li>Clipping: if the sound reaches minus 0.5 decibels or more, it says something like "Mic is clipping".</li>
+<li>Free space (recording only): it warns when free space on the recording drive falls below 10 gigabytes, and warns strongly below 2 gigabytes.</li>
+</ul>
+<p>All of these can be changed in the settings file (<a href="#config">chapter 14</a>).</p>
+
+<h3>6.8 Reading status and statistics</h3>
+<p>F5 (the key that works anywhere is Ctrl+Alt+F5) reads whether you are streaming or recording and the current scene. While streaming or recording, it also reads the elapsed time.</p>
+<p>Ctrl+Alt+F10 reads statistics: CPU usage, frame rate, whether frames are being dropped, and free space.</p>
+
+<h3 id="tracks">6.9 Recording audio tracks (recording sounds separately)</h3>
+<p>A recording can keep sound on up to 6 separate tracks. If you put the game audio, the screen reader voice, and the microphone on different tracks, you can adjust each volume later in an editing program. In OBS this is a table of check boxes; OBS Navi lists one track per row, and Enter turns it on or off.</p>
+<p>There are two things to decide.</p>
+<ol>
+<li><strong>Which tracks are recorded</strong>: Recording track settings in the Stream and Record menu. It lists 6 rows like "Record track 1, on". Press Enter to toggle; it reads something like "Set recorded audio to tracks 1 to 4. Takes effect from the next recording".</li>
+<li><strong>Which tracks each source sends to</strong>: select a source in the audio input list and open its settings (the first item of the Applications key menu). At the end are "Recording track 1, on" through "Recording track 6". Press Enter to toggle; it reads something like "Sent Mic to track 4. Now tracks 1 and 4". If you send it to a track that is not recorded, it says that too.</li>
+</ol>
+<p>The recommended assignment is below. Track 1 has everything and sounds the same as the stream. Tracks 1 to 4 are recorded. You can also hear it with Hear the recommended assignment in Recording track settings.</p>
+<p>The table has 3 rows and 2 columns: "Source" and "Tracks".</p>
+<table>
+<thead><tr><th scope="col">Source</th><th scope="col">Tracks</th></tr></thead>
+<tbody>
+<tr><td>Game and music audio</td><td>1 and 2</td></tr>
+<tr><td>Screen reader voice</td><td>1 and 3</td></tr>
+<tr><td>Microphone</td><td>1 and 4</td></tr>
+</tbody>
+</table>
+<p>To check, choose Read recording track assignment in the Audio menu (or in the Applications key menu of the audio input list). It reads which tracks are recorded and where each source goes, and names any source that does not end up in the recording. It only reads; it does not change settings.</p>
+<ul>
+<li>The recorded tracks cannot be changed while recording. The setting takes effect from the next recording, so stop recording first.</li>
+<li>If the OBS output mode is Simple and the recording quality is Same as stream, the recording has a single sound track like the stream, and this setting has no effect. OBS Navi tells you when you open it. In OBS, Settings, Output, set the output mode to Advanced, or set the recording quality to something other than Same as stream.</li>
+<li>The track used for streaming stays as set in OBS (track 1 by default). If track 1 has everything, the stream sounds the same as before.</li>
+</ul>
+
+<h2 id="scenes">7. Scenes</h2>
+<ul>
+<li><strong>Switch</strong>: select in the scene list and press Enter. When it switches, it reads "Scene …".</li>
+<li><strong>Create</strong>: choose Create scene in the Scenes menu and enter a name. If the name already exists, a different name is used and read out. Creating a scene does not change the current scene (what is on air does not change).</li>
+<li><strong>Settings</strong>: Scene settings lets you change the name, the transition (used only when switching to this scene), and the transition duration. Add a source to this scene places a source from another scene.</li>
+<li><strong>Delete</strong>: Delete scene. The confirmation tells you that sources that exist only in this scene are deleted with it and that this cannot be undone. The last scene cannot be deleted.</li>
+<li><strong>Order</strong>: Scene list order changes the order of the list in OBS Navi. The order in OBS itself does not change.</li>
+</ul>
+<p>Adding a source to a scene shares the same source rather than copying it. Changing its settings in one place affects every scene it is in.</p>
+
+<h2 id="sources">8. Sources</h2>
+
+<h3>8.1 Show and hide</h3>
+<p>Press Enter in the source list to toggle between shown and hidden.</p>
+<div class="box">
+<h4>Hiding a source also removes its sound</h4>
+<p>In OBS, hiding a source also removes its sound from the stream and the recording. To switch only the picture, use Video switch (8.4) or the stacking order (8.6).</p>
+</div>
+
+<h3>8.2 Create, configure, delete</h3>
+<p>Choose Create source in the Sources menu, choose a kind, and enter a name. It is created in the scene selected in the scene list.</p>
+<p>The settings dialog opens right after creating. First choose the items without which nothing is shown or heard, such as the target game for a game capture or the device for a camera.</p>
+<!-- gen:source_kinds -->
+<p>The kinds of sources you can create, in the order they appear in the list. The table has 12 rows and 2 columns: "Kind" and "What it is for".</p>
+<table>
+<thead><tr>
+<th scope="col">Kind</th>
+<th scope="col">What it is for</th>
+</tr></thead>
+<tbody>
+<tr><td>Camera</td><td>Captures video from a webcam or capture card</td></tr>
+<tr><td>Game Capture</td><td>Captures the game screen</td></tr>
+<tr><td>Window Capture</td><td>Captures the screen of the selected window</td></tr>
+<tr><td>Display Capture</td><td>Captures a whole monitor</td></tr>
+<tr><td>Application Audio</td><td>Captures audio from the selected application only</td></tr>
+<tr><td>Audio Input such as a Microphone</td><td>Captures audio from a microphone or line input</td></tr>
+<tr><td>Computer Audio</td><td>Captures all audio going to the speakers</td></tr>
+<tr><td>Music or Video File</td><td>Plays a file on your computer</td></tr>
+<tr><td>Image</td><td>Shows an image file on screen</td></tr>
+<tr><td>Text</td><td>Shows text on screen</td></tr>
+<tr><td>Browser</td><td>Shows a web page on screen. Used for stream alerts and the like</td></tr>
+<tr><td>Color Background</td><td>Places a rectangle filled with a chosen color</td></tr>
+</tbody>
+</table>
+<!-- /gen:source_kinds -->
+<p>To change settings, select the source in the source list or the audio input list and choose Source settings in the Applications key menu. For sources with audio, the first row of the settings is monitoring (9.4).</p>
+<p>To delete, choose Delete source. Deleting a source does not just remove it from this scene; it removes it from all scenes. This cannot be undone. If the source is used for BGM, Game switch, or a screen reader voice, the confirmation says so.</p>
+
+<h3>8.3 Game switch</h3>
+<p>F3 (the key that works anywhere is Ctrl+Alt+F3) shows a list of running game windows. Choose one and press Enter to point both the game video and the game audio to that game.</p>
+<ul>
+<li>For video, the source named "Game Capture" is used by default. If there is no source with that name, a game capture source is used (if there are two or more, you choose).</li>
+<li>The audio switched together is the Application Audio source named "Game Audio" by default.</li>
+</ul>
+<div class="box">
+<h4>When it reads "No target found for Game Audio"</h4>
+<p>This is also read when there is no source named "Game Audio" (it goes on to say "Start the game, then press F3 again", but starting the game does not fix it). To switch the game audio too, create an Application Audio source named "Game Audio", or write the name of your source in audio_sources under game_switch in the settings file.</p>
+</div>
+<p>If the source names were created while OBS Navi was in Japanese, the default names are the Japanese ones (<span lang="ja">ゲームキャプチャ</span> and <span lang="ja">ゲーム音</span>). The names in the settings file are the ones used.</p>
+<p>When called with the key that works anywhere, OBS Navi brings its window to the front before showing the list. If it cannot, it tells you to switch to OBS Navi with Alt+Tab and press F3.</p>
+
+<h3>8.4 Video switch</h3>
+<p>Ctrl+E chooses which video source in the scene on air is brought to the very front. When the capture card's picture (a screen with no signal) covers the game screen, you can switch without removing a source.</p>
+<p>It does not hide anything, so the sound is not affected. Note that the capture card's sound keeps going to the stream even when its picture is behind. To stop it, mute it in the audio input list.</p>
+
+<h3>8.5 BGM</h3>
+<p>Ctrl+B (the key that works anywhere is Ctrl+Alt+F7) plays and pauses BGM.</p>
+<ul>
+<li>The first time, it asks whether to create a source for BGM (named "BGM Music" by default) in the current scene. Choose Yes and a file chooser for the music file appears.</li>
+<li>If OBS already has a Music or Video File source, that is used (if there are two or more, you choose).</li>
+<li>If the music file cannot be found, a chooser appears so you can pick it again.</li>
+</ul>
+<p>If you cannot hear the BGM yourself, check monitoring (9.4).</p>
+
+<h3>8.6 Stacking order and list order</h3>
+<p>In the source list, Alt+Up Arrow brings the selected source one step forward and Alt+Down Arrow sends it one step back. It reads the new position, such as "Position 2 from the front, of 5". The stacking order is the front-to-back order of the picture and is also changed in OBS itself. It does not affect sound.</p>
+<p>Source list order changes only the order of the list in OBS Navi (OBS itself does not change).</p>
+<p>In the order dialog, Alt+Up and Down Arrow in the list move the selected row one step at a time. The Move up and Move down buttons do the same. Save confirms, and Cancel discards.</p>
+
+<h2 id="audio">9. Audio</h2>
+
+<h3>9.1 Mute</h3>
+<p>Press Enter in the audio input list to toggle mute.</p>
+<p>Mute only keeps the sound out of the stream and the recording. A source with monitoring on is still heard by you when muted. Conversely, a source set to Monitor only is not sent to the stream even when unmuted. In both cases, OBS Navi adds a note when it reads the change.</p>
+
+<h3>9.2 Volume</h3>
+<ul>
+<li>In the audio input list, Left and Right Arrow change the volume by 1 decibel, and Shift+Left and Right Arrow by 5 decibels.</li>
+<li>F7 lets you type a number, such as "-10", "5", or "+3.5". Full-width digits and a trailing "dB" are also accepted. The range is minus 100 to plus 26 decibels.</li>
+<li>The keys that work anywhere are Ctrl+Alt+F1 to lower and Ctrl+Alt+F2 to raise, and Ctrl+Alt+Shift+F1 and F2 to lower and raise in larger steps. The target is the input selected in the audio input list. Ctrl+Alt+F4 moves the target to the next input and reads its name and volume.</li>
+</ul>
+<p>Volume is read in decibels ("Mic plus 6 decibels"). It can also handle values above 0 decibels, which the OBS mixer slider cannot reach.</p>
+
+<h3>9.3 Reading levels</h3>
+<p>F6 (the key that works anywhere is Ctrl+Alt+F6) reads how loud each input is right now, one after another. It reads the maximum over the last 3 seconds, so it does not say "silent" just because you pressed during a pause for breath. Muted inputs are read as "muted".</p>
+<p>You can change the order with Level readout order in the Audio menu. Inputs not in the order follow at the end in name order. Turning on Do not read muted sources skips muted inputs.</p>
+
+<h3>9.4 Monitoring (whether you hear it yourself)</h3>
+<p>By default in OBS, a source's sound goes to the stream and the recording, but you do not hear it. This is usually why you cannot hear BGM you added.</p>
+<p>Change it in the first row of the source settings dialog. There are three choices:</p>
+<ul>
+<li>Off, sent to the stream but you do not hear it (the OBS default)</li>
+<li>Monitor only, not sent to the stream</li>
+<li>Monitor and output, you hear it and it is sent to the stream</li>
+</ul>
+<p>Where it is heard (which speakers or headphones) is set with Monitoring Device in OBS, Settings, Audio.</p>
+
+<h3 id="sr-voice">9.5 Sending screen reader voices to the stream</h3>
+<p>By default, you can send the NVDA voice and the PC-Talker voice to the stream, or keep them out, separately.</p>
+<ul>
+<li>NVDA voice: F8 (the key that works anywhere is Ctrl+Alt+F8)</li>
+<li>PC-Talker voice: F9 (the key that works anywhere is Ctrl+Alt+F9). PC-Talker is a Japanese screen reader</li>
+</ul>
+<p>Each press switches between sending and not sending (it toggles the mute of that input).</p>
+<p>The first time you press it, OBS Navi asks whether to create an input to capture the voice. Choose Yes to create the input in the current scene. The new input starts muted (not sent to the stream); press again to send it. Screen reader voices are only sent when you explicitly choose to, so they do not leak into a stream by accident.</p>
+
+<h4>For PC-Talker</h4>
+<p>Only the PC-Talker voice is captured (using Application Audio). PC-Talker must be running when the input is created.</p>
+
+<h4>For NVDA</h4>
+<p>NVDA has no window to capture from, so its voice is captured through the free virtual audio cable VB-CABLE. Setup is needed; do the following only if you use it.</p>
+<ol>
+<li>Install VB-CABLE from <a href="https://vb-audio.com/Cable/">https://vb-audio.com/Cable/</a>. After installation, "CABLE Output" appears among the recording devices. The installer window may not be read by your screen reader. In that case, open a Command Prompt as administrator, go to the extracted folder, and run <code>VBCABLE_Setup_x64.exe -i -h</code> to install without the window (the author confirmed this method).</li>
+<li>Open the Windows Sound settings (press Windows+R and type mmsys.cpl). On the Recording tab, open the properties of "CABLE Output". On the Listen tab, check Listen to this device and set the playback device to your usual speakers or headphones. Without this, you will no longer hear NVDA yourself.</li>
+<li>In NVDA's settings, Audio category, set the output device to "CABLE Input".</li>
+<li>Press F8 in OBS Navi to create the input.</li>
+</ol>
+<p>To undo this, set NVDA's output device back.</p>
+<p>Screen reader voice inputs are often silent, so they are excluded from the silence warning. Their names, keys, and capture methods can be changed in sr_sources in the settings file.</p>
+
+<h2 id="filters">10. Filters</h2>
+<p>The filter list shows the filters of the source you selected last (in the source list or the audio input list).</p>
+<ul>
+<li><strong>On or off</strong>: press Enter in the filter list. It reads something like "Enabled Noise Suppression".</li>
+<li><strong>Add</strong>: select a source in the source list or the audio input list and choose Add filter in the Applications key menu (it is also in the Filters menu). The list of kinds reads each name and what it is for. Noise Suppression is selected at first.</li>
+<li><strong>Settings</strong>: Filter settings changes values and methods. Reset to defaults returns them to the original values. The name and order do not change.</li>
+<li><strong>Delete</strong>: Delete filter. A confirmation appears.</li>
+</ul>
+<!-- gen:filter_kinds -->
+<p>The kinds of audio filters you can add, in the order they appear in the list. The table has 9 rows and 2 columns: "Kind" and "What it is for".</p>
+<table>
+<thead><tr>
+<th scope="col">Kind</th>
+<th scope="col">What it is for</th>
+</tr></thead>
+<tbody>
+<tr><td>Noise Suppression</td><td>Reduces constant sounds such as air conditioners and computer fans</td></tr>
+<tr><td>Noise Gate</td><td>Mutes the sound when it is quiet. Removes noise while you are not talking</td></tr>
+<tr><td>Compressor</td><td>Tames loud sounds to even out the volume. Makes your voice easier to hear</td></tr>
+<tr><td>Limiter</td><td>Keeps the sound from going over a set level. Prevents clipping</td></tr>
+<tr><td>Gain</td><td>Raises or lowers the volume. Use it when the microphone is too quiet</td></tr>
+<tr><td>Equalizer</td><td>Changes the amount of low, mid, and high frequencies</td></tr>
+<tr><td>Expander</td><td>Makes quiet sounds even quieter. Gentler than a noise gate</td></tr>
+<tr><td>Upward Compressor</td><td>Lifts quiet sounds. Makes whispers easier to hear</td></tr>
+<tr><td>Invert Polarity</td><td>Inverts the sound wave. Use it when two microphones cancel each other out</td></tr>
+</tbody>
+</table>
+<!-- /gen:filter_kinds -->
+<p>Video filters cannot be added. If you choose Add filter on a source without audio, OBS Navi reads why.</p>
+
+<h2 id="camera">11. Camera</h2>
+<ul>
+<li><strong>Check cameras</strong>: Check cameras in the Camera menu reads, for each camera (video capture device) source, the device name, whether it is running, whether video is coming in, and whether it is shown. It also tells you about devices connected to the computer that OBS is not using.</li>
+<li><strong>Enable or disable</strong>: Enable or disable camera (the key that works anywhere is Ctrl+Alt+Shift+F11) stops or starts the camera. If there are two or more camera sources, you choose. About 2.5 seconds after switching, it checks and reads the actual state, and if the camera could not be stopped, it warns "Could not stop … The camera is still running".</li>
+</ul>
+<p>This is different from Toggle virtual camera (Ctrl+Alt+F11). This one is a real camera; the other is the virtual camera that passes the OBS video to other apps.</p>
+
+<h2 id="keys">12. Key list</h2>
+<p>Inside OBS Navi, F1 reads the same list (one line at a time with Up and Down Arrow). The keys here are the default ones. If you change keys in the settings file, the F1 list shows the actual keys.</p>
+<!-- gen:keys -->
+<h3>While in the OBS Navi window</h3>
+<p>These keys work only while you are in the OBS Navi window. The table has 23 rows and 2 columns: "Key" and "Action".</p>
+<table>
+<thead><tr>
+<th scope="col">Key</th>
+<th scope="col">Action</th>
+</tr></thead>
+<tbody>
+<tr><td>Ctrl+S</td><td>Start streaming</td></tr>
+<tr><td>Ctrl+Shift+S</td><td>Stop streaming</td></tr>
+<tr><td>Ctrl+R</td><td>Start recording</td></tr>
+<tr><td>Ctrl+Shift+R</td><td>Stop recording</td></tr>
+<tr><td>F5</td><td>Read status</td></tr>
+<tr><td>F6</td><td>Read levels</td></tr>
+<tr><td>F7</td><td>Enter volume as a number</td></tr>
+<tr><td>F3</td><td>Game switch</td></tr>
+<tr><td>Ctrl+B</td><td>Play or pause BGM</td></tr>
+<tr><td>Ctrl+E</td><td>Video switch</td></tr>
+<tr><td>Ctrl+P</td><td>Pause or resume recording</td></tr>
+<tr><td>F1</td><td>Key list</td></tr>
+<tr><td>F8</td><td>Toggle NVDA Voice in the stream</td></tr>
+<tr><td>F9</td><td>Toggle PC-Talker Voice in the stream</td></tr>
+<tr><td>Enter</td><td>Act on the selected list (start and stop streaming and recording, switch scenes, show or hide sources, mute, turn filters on or off)</td></tr>
+<tr><td>Applications key</td><td>Show the actions available for the selected list (choose with Down Arrow and press Enter; the first item is Settings)</td></tr>
+<tr><td>Shift+F10</td><td>Same, show the list of actions (for keyboards without an Applications key)</td></tr>
+<tr><td>Left and Right Arrow</td><td>In the audio input list, lower or raise the volume</td></tr>
+<tr><td>Shift+Left and Right Arrow</td><td>Same, in larger steps</td></tr>
+<tr><td>Alt+Up and Down Arrow</td><td>In the source list, bring the selected source forward or send it backward (stacking order; does not change the sound)</td></tr>
+<tr><td>Escape</td><td>Close a settings dialog. Note: does not quit OBS Navi</td></tr>
+<tr><td>Alt+F4</td><td>Quit OBS Navi (same as Exit in the menu)</td></tr>
+<tr><td>Alt or F10</td><td>Open the menu bar</td></tr>
+</tbody>
+</table>
+<h3>Keys that work anywhere</h3>
+<p>These keys work even while you are using a game or another app. The table has 21 rows and 2 columns: "Key" and "Action".</p>
+<table>
+<thead><tr>
+<th scope="col">Key</th>
+<th scope="col">Action</th>
+</tr></thead>
+<tbody>
+<tr><td>Ctrl+Alt+F5</td><td>Read status</td></tr>
+<tr><td>Ctrl+Alt+F6</td><td>Read levels</td></tr>
+<tr><td>Ctrl+Alt+F8</td><td>Toggle NVDA Voice in the stream</td></tr>
+<tr><td>Ctrl+Alt+F9</td><td>Toggle PC-Talker Voice in the stream</td></tr>
+<tr><td>Ctrl+Alt+F1</td><td>Lower volume</td></tr>
+<tr><td>Ctrl+Alt+F2</td><td>Raise volume</td></tr>
+<tr><td>Ctrl+Alt+F4</td><td>Next target for volume</td></tr>
+<tr><td>Ctrl+Alt+F10</td><td>Read statistics</td></tr>
+<tr><td>Ctrl+Alt+F11</td><td>Toggle virtual camera</td></tr>
+<tr><td>Ctrl+Alt+F12</td><td>Save replay</td></tr>
+<tr><td>Ctrl+Alt+F3</td><td>Game switch</td></tr>
+<tr><td>Ctrl+Alt+F7</td><td>Play or pause BGM</td></tr>
+<tr><td>Ctrl+Alt+Shift+F1</td><td>Lower volume in large steps</td></tr>
+<tr><td>Ctrl+Alt+Shift+F2</td><td>Raise volume in large steps</td></tr>
+<tr><td>Ctrl+Alt+Shift+F5</td><td>Pause or resume recording</td></tr>
+<tr><td>Ctrl+Alt+Shift+F12</td><td>Add chapter</td></tr>
+<tr><td>Ctrl+Alt+Shift+F11</td><td>Enable or disable camera</td></tr>
+<tr><td>Ctrl+Alt+Shift+F6</td><td>Start streaming (press twice in a row)</td></tr>
+<tr><td>Ctrl+Alt+Shift+F7</td><td>Stop streaming (press twice in a row)</td></tr>
+<tr><td>Ctrl+Alt+Shift+F8</td><td>Start recording</td></tr>
+<tr><td>Ctrl+Alt+Shift+F9</td><td>Stop recording</td></tr>
+</tbody>
+</table>
+<!-- /gen:keys -->
+<p>Keys that work anywhere cannot be registered if another app is already using them. In that case, OBS Navi reads "The following global hotkeys could not be registered" and the keys when it starts.</p>
+
+<h2 id="menus">13. Menu list</h2>
+<!-- gen:menus -->
+<p>There are 8 menus. From left to right: Stream and Record, Scenes, Sources, Filters, Camera, Audio, Tools, Help. The text in parentheses after an item is its key.</p>
+<h3>Stream and Record menu (Alt+S opens it directly)</h3>
+<p>12 items.</p>
+<ul>
+<li>Start streaming (Ctrl+S)</li>
+<li>Stop streaming (Ctrl+Shift+S)</li>
+<li>Start recording (Ctrl+R)</li>
+<li>Stop recording (Ctrl+Shift+R)</li>
+<li>Pause or resume recording (Ctrl+P)</li>
+<li>Add chapter (Ctrl+Alt+Shift+F12)</li>
+<li>Save replay (Ctrl+Alt+F12)</li>
+<li>Toggle virtual camera (Ctrl+Alt+F11)</li>
+<li>Check recording settings</li>
+<li>Recording track settings</li>
+<li>Open last recording</li>
+<li>Exit (Alt+F4)</li>
+</ul>
+<h3>Scenes menu (Alt+C opens it directly)</h3>
+<p>4 items.</p>
+<ul>
+<li>Create scene</li>
+<li>Scene settings</li>
+<li>Delete scene</li>
+<li>Scene list order</li>
+</ul>
+<h3>Sources menu (Alt+O opens it directly)</h3>
+<p>9 items.</p>
+<ul>
+<li>Create source</li>
+<li>Source settings</li>
+<li>Delete source</li>
+<li>Game switch (F3)</li>
+<li>Video switch (Ctrl+E)</li>
+<li>Play or pause BGM (Ctrl+B)</li>
+<li>Bring source forward (stacking order)</li>
+<li>Send source backward (stacking order)</li>
+<li>Source list order</li>
+</ul>
+<h3>Filters menu (Alt+F opens it directly)</h3>
+<p>3 items.</p>
+<ul>
+<li>Add filter</li>
+<li>Filter settings</li>
+<li>Delete filter</li>
+</ul>
+<h3>Camera menu (Alt+K opens it directly)</h3>
+<p>2 items.</p>
+<ul>
+<li>Check cameras</li>
+<li>Enable or disable camera (Ctrl+Alt+Shift+F11)</li>
+</ul>
+<h3>Audio menu (Alt+A opens it directly)</h3>
+<p>7 items.</p>
+<ul>
+<li>Toggle NVDA Voice in the stream (F8)</li>
+<li>Toggle PC-Talker Voice in the stream (F9)</li>
+<li>Read levels (F6)</li>
+<li>Enter volume as a number (F7)</li>
+<li>Level readout order</li>
+<li>Read recording track assignment</li>
+<li>Do not read muted sources (a check item that turns on or off each time you choose it)</li>
+</ul>
+<h3>Tools menu (Alt+T opens it directly)</h3>
+<p>4 items.</p>
+<ul>
+<li>Read status (F5)</li>
+<li>Read statistics (Ctrl+Alt+F10)</li>
+<li>Reconnect to OBS</li>
+<li><span lang="ja">表示の言語</span> (Language)</li>
+</ul>
+<h3>Help menu (Alt+H opens it directly)</h3>
+<p>2 items.</p>
+<ul>
+<li>Key list (F1)</li>
+<li>About OBS Navi</li>
+</ul>
+<!-- /gen:menus -->
+
+<h2 id="config">14. Settings file</h2>
+<p>Settings are in obs_navi_config.json in the same folder as OBSNavi.exe. It is created the first time OBS Navi starts. Things you change in OBS Navi, such as list orders and the BGM source name, are also saved here.</p>
+<ul>
+<li>To edit it, exit OBS Navi first, then open it in Notepad or similar. If you edit it while OBS Navi is running, OBS Navi may overwrite it.</li>
+<li>If the file is broken and cannot be read, OBS Navi starts with the default settings and tells you so. In that case, changes are not saved (so that the broken file is not overwritten).</li>
+<li>To return to the initial state, exit OBS Navi and delete this file. It is created again the next time OBS Navi starts.</li>
+<li>The password for connecting to OBS is not stored in this file (it is read from the OBS settings file).</li>
+</ul>
+<!-- gen:config -->
+<p>The main items in the settings file. A name with a dot means the item is inside the item before the dot (for example, record.disk_warn_mb is disk_warn_mb inside record). The table has 24 rows and 3 columns: "Item", "Default", and "Meaning".</p>
+<table>
+<thead><tr>
+<th scope="col">Item</th>
+<th scope="col">Default</th>
+<th scope="col">Meaning</th>
+</tr></thead>
+<tbody>
+<tr><td>language</td><td>"auto"</td><td>The display and speech language. "auto" follows the Windows display language (Japanese if it is Japanese, otherwise English), "ja" is Japanese, and "en" is English. You can also choose it with Language in the Tools menu. It takes effect the next time you start OBS Navi</td></tr>
+<tr><td>auto_password</td><td>true</td><td>If true, the port and password for the connection are read from the OBS settings file. Usually left as is</td></tr>
+<tr><td>host</td><td>"localhost"</td><td>The computer where OBS is running. Leave it as is if it is the same computer</td></tr>
+<tr><td>global_hotkeys_enabled</td><td>true</td><td>Whether to use the keys that work anywhere. If false, they are not registered</td></tr>
+<tr><td>global_hotkey_modifier</td><td>"Ctrl+Alt"</td><td>The modifier keys for the keys that work anywhere. Join Ctrl, Alt, Shift, and Win with +. The stronger level adds one more key to this (Alt if Alt is not included, otherwise Shift)</td></tr>
+<tr><td>sr_sources</td><td>NVDA Voice (key F8), PC-Talker Voice (key F9)</td><td>The inputs that send screen reader voices to the stream. Each has a name, a method, and a key (F1 to F12)</td></tr>
+<tr><td>silence_seconds</td><td>60.0</td><td>While streaming or recording, you are notified if silence continues for this many seconds</td></tr>
+<tr><td>silence_threshold_db</td><td>-50.0</td><td>Sound quieter than this is treated as silence (decibels)</td></tr>
+<tr><td>clip_threshold_db</td><td>-0.5</td><td>You are notified of clipping when the sound reaches this level (decibels)</td></tr>
+<tr><td>monitor_enabled</td><td>true</td><td>Whether to warn about silence and clipping</td></tr>
+<tr><td>level_hold_seconds</td><td>3.0</td><td>The level read with F6 is the maximum over this many recent seconds. With 0, the value at the moment you press is read</td></tr>
+<tr><td>volume_step_db</td><td>1.0</td><td>How much Left and Right Arrow change the volume (decibels)</td></tr>
+<tr><td>volume_coarse_step_db</td><td>5.0</td><td>How much Shift+Left and Right Arrow change the volume (decibels)</td></tr>
+<tr><td>game_switch.video_source</td><td>"Game Capture"</td><td>The name of the video source used by Game switch. If it is not found, you can choose again from the game capture sources</td></tr>
+<tr><td>game_switch.audio_sources</td><td>["Game Audio"]</td><td>The names of the Application Audio sources switched together with Game switch</td></tr>
+<tr><td>bgm.source_name</td><td>"BGM Music"</td><td>The name of the media source used for BGM</td></tr>
+<tr><td>record.pause_reminder_seconds</td><td>300.0</td><td>While recording stays paused, you are reminded every this many seconds. 0 turns the reminder off</td></tr>
+<tr><td>record.disk_warn_mb</td><td>10240.0</td><td>While recording, you are warned when free space falls below this (megabytes). 0 turns it off</td></tr>
+<tr><td>record.disk_critical_mb</td><td>2048.0</td><td>Free space for the stronger warning (megabytes)</td></tr>
+<tr><td>record.announce_file_name</td><td>true</td><td>Whether to read the file name when you stop recording or save a replay</td></tr>
+<tr><td>record.pause_hotkey</td><td>"F5"</td><td>The key that works anywhere for pausing and resuming recording (stronger level). Empty means no key</td></tr>
+<tr><td>record.chapter_hotkey</td><td>"F12"</td><td>The key that works anywhere for adding a chapter (stronger level)</td></tr>
+<tr><td>camera.hotkey</td><td>"F11"</td><td>The key that works anywhere for enabling or disabling the camera (stronger level)</td></tr>
+<tr><td>camera.confirm_before_toggle</td><td>false</td><td>Whether to ask before switching the camera</td></tr>
+</tbody>
+</table>
+<!-- /gen:config -->
+
+<h2 id="trouble">15. Troubleshooting</h2>
+<dl>
+<dt>It reads "Could not connect to OBS. Check that OBS is running"</dt>
+<dd>Check that OBS is running and that the WebSocket server is enabled (3.1). If you started OBS later, choose Reconnect to OBS in the Tools menu.</dd>
+<dt>It reads "Could not get the WebSocket password"</dt>
+<dd>In OBS, WebSocket Server Settings, check Enable Authentication, make sure there is a server password, and close with OK. Then choose Reconnect to OBS.</dd>
+<dt>It reads "Authentication with OBS failed"</dt>
+<dd>This happens, for example, right after the password was regenerated in OBS. Close WebSocket Server Settings in OBS with OK, then choose Reconnect to OBS.</dd>
+<dt>Nothing is spoken</dt>
+<dd>Check that your screen reader is running. OBS Navi finds the running screen reader and speaks through it.</dd>
+<dt>It reads "The following global hotkeys could not be registered" at startup</dt>
+<dd>Another app is using some of the keys that work anywhere. Those keys do not work, but other keys and the menus do. Changing global_hotkey_modifier in the settings file moves them all to another modifier.</dd>
+<dt>Settings are not saved</dt>
+<dd>The folder may not be writable. Move it to Documents or a similar place (3.2).</dd>
+<dt>The window and speech are in Japanese (or English) and I want the other</dt>
+<dd>Choose <span lang="ja">表示の言語</span> (Language) in the Tools menu (Alt+T) and pick the language (see Display language in chapter 1).</dd>
+<dt>I cannot hear BGM or a source myself. I still hear it after muting</dt>
+<dd>Check monitoring (9.4).</dd>
+<dt>Chapters cannot be added</dt>
+<dd>Check that the recording format is "Hybrid MP4 (.mp4)" or "Hybrid MOV (.mov)", and that you restarted OBS after changing it (6.4).</dd>
+<dt>The recording has no sound, or some sounds are missing</dt>
+<dd>Use Read recording track assignment in the Audio menu to check whether some sources are not recorded (6.9).</dd>
+<dt>Replays cannot be saved</dt>
+<dd>Enable the replay buffer in OBS (6.6).</dd>
+<dt>Game switch reads "No target found for Game Audio"</dt>
+<dd>Read the box in 8.3.</dd>
+<dt>Windows or antivirus software blocks it from starting</dt>
+<dd>For "Windows protected your PC", follow the steps in 3.3. Apps made with Python are sometimes falsely detected by antivirus software. If Smart App Control in Windows 11 is on, the app may not start. In any of these cases, please tell the author instead of forcing a change to your settings.</dd>
+<dt>The OBS window itself is read strangely</dt>
+<dd>That is a problem in OBS itself and OBS Navi cannot fix it. See whether the same action can be done in OBS Navi.</dd>
+</dl>
+
+<h2 id="uninstall">16. Uninstalling</h2>
+<p>Delete the whole OBS Navi folder. OBS Navi writes nothing outside its own folder (nothing in the registry, for example).</p>
+<p>Things OBS Navi created in OBS (screen reader voice inputs, the BGM source, and so on) stay in OBS. If you do not need them, delete them with Delete source in OBS Navi before removing it, or delete them in OBS itself. If you no longer use the OBS WebSocket server, you can turn it off in WebSocket Server Settings.</p>
+
+<h2 id="license">17. License</h2>
+<p>OBS Navi is distributed under the GNU General Public License version 3 (GPL version 3). Copyright belongs to the author (Takahashi, 2026).</p>
+<ul>
+<li>You are free to use, share, and modify it. When you share it, use the same license and include the source code. The source code is in the included source folder.</li>
+<li>It comes with no warranty. The author cannot take responsibility for anything that happens from using OBS Navi.</li>
+<li>The full license text is in the included LICENSE.txt. The bundled components and their licenses are in THIRD-PARTY-NOTICES.txt.</li>
+<li>About OBS Navi in the Help menu also reads out this license.</li>
+</ul>
+<p>OBS Navi is software made by an individual and is not affiliated with the OBS Project, which makes OBS Studio.</p>
+
+<p>This is the end of the manual.</p>
+</body>
+</html>

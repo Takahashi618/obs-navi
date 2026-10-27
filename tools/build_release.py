@@ -5,8 +5,13 @@
     python -X utf8 tools/build_release.py --allow-dirty   試しに作る（書きかけの変更あり）
 
 できるもの（release/ は git 管理外）:
-    release/OBSナビ_<版>_テスト版/        中身を並べたフォルダ（確かめる用）
-    release/OBSナビ_<版>_テスト版.zip     配るもの
+    release/obs-navi-<版>-test/        中身を並べたフォルダ（確かめる用）
+    release/obs-navi-<版>-test.zip     配るもの
+
+★配布物のファイル名とフォルダ名はすべて英字にする（0.20.1、利用者の
+  指示）。日本語の名前は、展開する道具や環境によって文字化けすることが
+  ある。zip の名前は GitHub のリポジトリ名（obs-navi）とそろえる。
+  日本語の書類は名前に「(Japanese)」、英語の書類は「(English)」を付ける
 
 手順。どこかで失敗したら zip は作らない:
  1. 実行ファイルを確かめる。exe の中の版が version.py と同じか、exe が
@@ -15,8 +20,8 @@
     検査する（tools/check_html.py）
  3. ソースに書きかけの変更が無いかを git で確かめる（同梱するソースと
     exe・文書がずれないように）
- 4. 並べる: exe 一式、文書（HTML と txt）、ライセンス、同梱部品の
-    ライセンス、ソースコード
+ 4. 並べる: exe 一式、文書（HTML と txt。日本語と英語）、ライセンス、
+    同梱部品のライセンス、ソースコード
  5. zip にして、中身を確かめる
 
 ★OBSナビは GPL-3.0 で配る（使っている obsws-python が GPL-3.0 のため）。
@@ -49,13 +54,16 @@ import doc_parts  # noqa: E402  （import した時点で読み上げを無音�
 from html_to_txt import DocumentToText  # noqa: E402
 from version import VERSION  # noqa: E402
 
-DIST = ROOT / "dist" / "OBSナビ"
-EXE = DIST / "OBSナビ.exe"
+DIST = ROOT / "dist" / "OBSNavi"
+EXE = DIST / "OBSNavi.exe"
 BUILD = ROOT / "build" / "obs_navi"
 RELEASE = ROOT / "release"
 DOCS = ROOT / "docs"
-NAME = f"OBSナビ_{VERSION}_テスト版"
-SOURCE_DIR = "ソースコード"
+NAME = f"obs-navi-{VERSION}-test"
+SOURCE_DIR = "source"
+# ソースコードのフォルダに入れる説明（日本語と英語）
+SOURCE_ABOUT = "About the source code (Japanese).txt"
+SOURCE_ABOUT_EN = "About the source code (English).txt"
 
 # 読み上げの橋渡しをする DLL。1つでも欠けると「起動するが喋らない」
 # （obs_navi.spec の説明）
@@ -73,18 +81,29 @@ SOURCE_GLOBS = ("app.py", "version.py", "speech.py", "obs_navi.spec",
 # ★開発中の確かめ用スクリプト、作業記録、利用者の設定
 #   （obs_navi_config.json）は入れない
 SOURCE_INCLUDE = ("app.py", "version.py", "speech.py", "obs_navi.spec",
-                  "LICENSE.txt", "README.md", "core/", "ui/", "tests/",
-                  "tools/", "docs/")
+                  "LICENSE.txt", "README.md", "README.en.md", "core/", "ui/",
+                  "tests/", "tools/", "docs/")
 
-# 文書: (元の HTML, 配布物での名前（拡張子なし）)
-DOC_PAGES = (("manual.html", "マニュアル"), ("tester.html", "テストのお願い"))
+# 文書: (元の HTML, 配布物での名前（拡張子なし）)。名前は英字にし、
+# 言語を「(Japanese)」「(English)」で見分ける
+DOC_PAGES = (("manual.html", "Manual (Japanese)"),
+             ("tester.html", "Testing Guide (Japanese)"),
+             ("manual.en.html", "Manual (English)"),
+             ("tester.en.html", "Testing Guide (English)"))
 
-# 配布物の直下に並ぶもの。はじめにお読みくださいの「ファイルが8つ、
-# フォルダが2つ」と一致させる（ずれたら止める）
+# はじめにお読みください: (元のテンプレート, 配布物での名前)
+README_FIRST = (("readme_first.txt", "README (Japanese).txt"),
+                ("readme_first.en.txt", "README (English).txt"))
+
+# 配布物の直下に並ぶもの。はじめにお読みくださいの「ファイルが13、
+# フォルダが2つ」（英語版は 13 files and 2 folders）と一致させる
+# （ずれたら止める）
 TOP_FILES = frozenset({
-    "OBSナビ.exe", "はじめにお読みください.txt",
-    "マニュアル.html", "マニュアル.txt",
-    "テストのお願い.html", "テストのお願い.txt",
+    "OBSNavi.exe", "README (Japanese).txt", "README (English).txt",
+    "Manual (Japanese).html", "Manual (Japanese).txt",
+    "Manual (English).html", "Manual (English).txt",
+    "Testing Guide (Japanese).html", "Testing Guide (Japanese).txt",
+    "Testing Guide (English).html", "Testing Guide (English).txt",
     "LICENSE.txt", "THIRD-PARTY-NOTICES.txt",
 })
 TOP_DIRS = frozenset({"_internal", SOURCE_DIR})
@@ -177,19 +196,20 @@ def check_docs() -> None:
 
 
 def check_readme() -> None:
-    """README.md の部品の版が、今入っている版と同じか。
+    """README.md と README.en.md の部品の版が、今入っている版と同じか。
 
     ★README はテンプレートにせず、そのまま読める形で置く（GitHub で
     表示する）。そのかわり、書いてある入れ方の行が今の版とずれたら止める。
     """
-    text = (ROOT / "README.md").read_text(encoding="utf-8")
     values = dependency_values()
-    stale = [values[k] for k in ("PIP_INSTALL", "PYINSTALLER_PIN")
-             if values[k] not in text]
-    if stale:
-        raise ReleaseError("README.md の部品の版が古くなっています。"
-                           "次の行に合わせてください: " + " / ".join(stale))
-    print("  README.md の部品の版は今と同じ")
+    for name in ("README.md", "README.en.md"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        stale = [values[k] for k in ("PIP_INSTALL", "PYINSTALLER_PIN")
+                 if values[k] not in text]
+        if stale:
+            raise ReleaseError(f"{name} の部品の版が古くなっています。"
+                               "次の行に合わせてください: " + " / ".join(stale))
+        print(f"  {name} の部品の版は今と同じ")
 
 
 # ------------------------------------------------------------
@@ -394,14 +414,21 @@ def third_party_notices() -> str:
 
     lines = [
         f"OBSナビ {VERSION} に同梱している部品とライセンス",
+        f"(Components bundled with OBS Navi {VERSION} and their licenses)",
         "",
         "OBSナビ本体は GNU GPL 第3版で配布しています（全文は LICENSE.txt）。",
-        "OBSナビ.exe と _internal フォルダには、次の部品が入っています。",
+        "OBSNavi.exe と _internal フォルダには、次の部品が入っています。",
         "この一覧は、実行ファイルを作ったときの記録（PyInstaller の目録）から",
         "作りました。部品ごとのライセンスの全文を、後ろに原文（英語）のまま",
         "載せています。",
         "",
-        f"部品は{len(entries)}件です。",
+        "OBS Navi itself is distributed under the GNU GPL version 3 (full text",
+        "in LICENSE.txt). The program file and the _internal folder contain the",
+        "components below. This list was made from the PyInstaller build",
+        "records. The full license text of each component follows, in the",
+        "original English.",
+        "",
+        f"部品は{len(entries)}件です。 ({len(entries)} components.)",
     ]
     lines += [f"{i}. {n} {v}（{lab}）"
               for i, (n, v, lab, _t) in enumerate(entries, 1)]
@@ -488,9 +515,9 @@ def stage_release(commit: str) -> Path:
         text = html_to_text(DOCS / src)
         write_text_for_windows(stage / f"{name}.txt", text)
         print(f"  {name}.txt  {len(text)}文字")
-    write_text_for_windows(
-        stage / "はじめにお読みください.txt",
-        fill(DOCS / "readme_first.txt", {"VERSION": VERSION}))
+    for src, name in README_FIRST:
+        write_text_for_windows(
+            stage / name, fill(DOCS / src, {"VERSION": VERSION}))
     shutil.copy2(ROOT / "LICENSE.txt", stage / "LICENSE.txt")
     notices = third_party_notices()
     write_text_for_windows(stage / "THIRD-PARTY-NOTICES.txt", notices)
@@ -503,8 +530,16 @@ def stage_release(commit: str) -> Path:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / rel, dest)
     values = {"VERSION": VERSION, "COMMIT": commit, **dependency_values()}
-    write_text_for_windows(src_dir / "ソースコードについて.txt",
+    write_text_for_windows(src_dir / SOURCE_ABOUT,
                            fill(DOCS / "source_readme.txt", values))
+    # 英語版。★コミットの名前の「（書きかけの変更あり）」は英語にする
+    values_en = dict(values, COMMIT=commit.replace(
+        "（書きかけの変更あり）", " (with uncommitted changes)"))
+    values_en["REQUIREMENTS"] = values["REQUIREMENTS"].replace(
+        "・", "- ").replace("（実行ファイルを作るときだけ）",
+                             " (only for building the program file)")
+    write_text_for_windows(src_dir / SOURCE_ABOUT_EN,
+                           fill(DOCS / "source_readme.en.txt", values_en))
     print(f"  ソースコード: {len(files)}ファイル（コミット {commit}）")
     return stage
 
@@ -552,13 +587,13 @@ def verify_zip(zip_path: Path) -> None:
         if not EXPECTED_DLLS <= have:
             raise ReleaseError(
                 f"zip に読み上げ用の DLL が足りません: {EXPECTED_DLLS - have}")
-        # ★日本語のファイル名は UTF-8 の印（0x800）が無いと、Windows の
-        #   「すべて展開」で文字化けする
-        no_flag = [i.filename for i in infos
-                   if not i.filename.isascii() and not i.flag_bits & 0x800]
-        if no_flag:
-            raise ReleaseError(f"UTF-8 の印の無い日本語名があります: {no_flag[:3]}")
-        exe_info = zf.getinfo(f"{prefix}OBSナビ.exe")
+        # ★名前はすべて英字（ASCII）にする。日本語の名前は、展開する道具や
+        #   環境によって文字化けする（UTF-8 の印 0x800 を付けても、読まない
+        #   道具がある）
+        non_ascii = [n for n in names if not n.isascii()]
+        if non_ascii:
+            raise ReleaseError(f"英字でない名前があります: {non_ascii[:3]}")
+        exe_info = zf.getinfo(f"{prefix}{EXE.name}")
         if exe_info.CRC != zlib.crc32(EXE.read_bytes()):
             raise ReleaseError("zip の中の exe が dist の exe と違います")
         for n in names:
@@ -574,6 +609,7 @@ def verify_zip(zip_path: Path) -> None:
         size = zip_path.stat().st_size / 1024 / 1024
         print(f"  {len(names)}ファイル、{size:.1f}MB。壊れていない")
         print(f"  直下: ファイル{len(tops_files)}つ、フォルダ{len(tops_dirs)}つ")
+        print("  名前はすべて英字")
         digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
         print(f"  SHA-256: {digest}")
 

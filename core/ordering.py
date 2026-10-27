@@ -19,6 +19,8 @@ OBS から来た順のまま（ソース一覧の順は重なり順という意�
 """
 from __future__ import annotations
 
+from .i18n import tr
+
 
 def apply_order_by(items, order=None, key=None, sort_rest=False) -> list:
     """items を order の並びへ寄せる。
@@ -109,7 +111,7 @@ def default_label(sort_rest: bool = False) -> str:
     戻したときの読み上げの3か所で別々に書いていたので、片方だけ
     言い換えると同じ並びが場面ごとに違う名前で読まれてしまう。
     """
-    return "名前順" if sort_rest else "OBSと同じ順"
+    return tr("名前順", "name order") if sort_rest else tr("OBSと同じ順", "the same order as OBS")
 
 
 def move(rows, index: int, delta: int) -> int:

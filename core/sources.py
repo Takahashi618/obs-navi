@@ -23,6 +23,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .i18n import tr
+
 # 種別の識別子（実測。バージョン付きのものは間違えやすいので定数化する）
 KIND_CAMERA = "dshow_input"
 KIND_GAME = "game_capture"
@@ -54,43 +56,43 @@ class SourceKind:
 # ★載せるのは props.PROP_TABLE に項目がある種別だけ（冒頭の方針）。
 CREATABLE_KINDS: list[SourceKind] = [
     SourceKind(
-        KIND_CAMERA, "カメラ",
-        "ウェブカメラやキャプチャーボードの映像を取り込みます",
+        KIND_CAMERA, tr("カメラ", "Camera"),
+        tr("ウェブカメラやキャプチャーボードの映像を取り込みます", "Captures video from a webcam or capture card"),
         needs="video_device_id"),
     SourceKind(
-        KIND_GAME, "ゲームキャプチャ",
-        "ゲームの画面を取り込みます", needs="window"),
+        KIND_GAME, tr("ゲームキャプチャ", "Game Capture"),
+        tr("ゲームの画面を取り込みます", "Captures the game screen"), needs="window"),
     SourceKind(
-        KIND_WINDOW, "ウィンドウキャプチャ",
-        "選んだウィンドウの画面を取り込みます", needs="window"),
+        KIND_WINDOW, tr("ウィンドウキャプチャ", "Window Capture"),
+        tr("選んだウィンドウの画面を取り込みます", "Captures the screen of the selected window"), needs="window"),
     SourceKind(
-        KIND_MONITOR, "画面キャプチャ",
-        "モニター全体を取り込みます", needs="monitor_id"),
+        KIND_MONITOR, tr("画面キャプチャ", "Display Capture"),
+        tr("モニター全体を取り込みます", "Captures a whole monitor"), needs="monitor_id"),
     SourceKind(
-        KIND_APP_AUDIO, "アプリの音",
-        "選んだアプリの音だけを取り込みます", needs="window"),
+        KIND_APP_AUDIO, tr("アプリの音", "Application Audio"),
+        tr("選んだアプリの音だけを取り込みます", "Captures audio from the selected application only"), needs="window"),
     SourceKind(
-        KIND_AUDIO_IN, "マイクなどの音声入力",
-        "マイクやライン入力の音を取り込みます", needs="device_id"),
+        KIND_AUDIO_IN, tr("マイクなどの音声入力", "Audio Input such as a Microphone"),
+        tr("マイクやライン入力の音を取り込みます", "Captures audio from a microphone or line input"), needs="device_id"),
     SourceKind(
-        KIND_AUDIO_OUT, "パソコンの音",
-        "スピーカーへ出ている音をまとめて取り込みます", needs="device_id"),
+        KIND_AUDIO_OUT, tr("パソコンの音", "Computer Audio"),
+        tr("スピーカーへ出ている音をまとめて取り込みます", "Captures all audio going to the speakers"), needs="device_id"),
     SourceKind(
-        KIND_MEDIA, "音楽や動画のファイル",
-        "手元のファイルを再生します", needs="local_file"),
+        KIND_MEDIA, tr("音楽や動画のファイル", "Music or Video File"),
+        tr("手元のファイルを再生します", "Plays a file on your computer"), needs="local_file"),
     SourceKind(
-        KIND_IMAGE, "画像",
-        "画像ファイルを画面に出します", needs="file"),
+        KIND_IMAGE, tr("画像", "Image"),
+        tr("画像ファイルを画面に出します", "Shows an image file on screen"), needs="file"),
     SourceKind(
-        KIND_TEXT, "テキスト",
-        "文字を画面に出します", needs="text"),
+        KIND_TEXT, tr("テキスト", "Text"),
+        tr("文字を画面に出します", "Shows text on screen"), needs="text"),
     SourceKind(
-        KIND_BROWSER, "ブラウザ",
-        "ウェブページを画面に出します。配信の通知などに使います",
+        KIND_BROWSER, tr("ブラウザ", "Browser"),
+        tr("ウェブページを画面に出します。配信の通知などに使います", "Shows a web page on screen. Used for stream alerts and the like"),
         needs="url"),
     SourceKind(
-        KIND_COLOR, "単色の背景",
-        "決めた色で塗りつぶした四角を置きます", needs=""),
+        KIND_COLOR, tr("単色の背景", "Color Background"),
+        tr("決めた色で塗りつぶした四角を置きます", "Places a rectangle filled with a chosen color"), needs=""),
 ]
 
 # 音声しか持たない種別。作ったあとの案内を変えるために使う

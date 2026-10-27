@@ -16,6 +16,7 @@ import contextlib
 import functools
 import os
 import subprocess
+import sys
 import time
 
 import wx
@@ -24,7 +25,9 @@ import speech
 from core import (
     camera, commands, filters, hotkeys, keymap, ordering, props, recording,
     scenes, setup, sources, speech_format, tracks, video, volume)
+from core import i18n
 from core.config import Config
+from core.i18n import tr
 from core.connection import ObsConnection, ObsConnectError
 from core.levels import LevelMonitor, peak_db_from_levels
 from core.settings_op import SettingsOp
@@ -118,7 +121,7 @@ class MainFrame(wx.Frame):
     """OBSナビのメインウィンドウ。"""
 
     def __init__(self, config: Config) -> None:
-        super().__init__(None, title=f"OBSナビ {VERSION}")
+        super().__init__(None, title=tr(f"OBSナビ {VERSION}", f"OBS Navi {VERSION}"))
         self.config = config
         self.conn = ObsConnection(config)
         self.monitor = LevelMonitor(
@@ -213,6 +216,9 @@ class MainFrame(wx.Frame):
         # ★別々の CallLater で読むと、speech.warn の割り込みで先の警告が
         #   途中で切られてしまう（0.14.0 で実際に起きた）
         self._key_problems: list[str] = []
+        # 言語を選び直して「今すぐ再起動」を選んだとき、閉じたあとに
+        # もう1つ起動する（on_language / on_close）
+        self._restart_after_close = False
         # 窓内キーの振り分け表（(修飾フラグ, キーコード) → 実行する処理）。
         # ★keymap.WINDOW_PLAN から作る＝表示と動作の出どころを1つにする
         self._window_dispatch: dict = {}
@@ -264,7 +270,7 @@ class MainFrame(wx.Frame):
         #   スクロールへ逃がし、Tab で移った欄は見える位置まで送られる
         panel = wx.ScrolledWindow(self, style=wx.TAB_TRAVERSAL | wx.VSCROLL)
         panel.SetScrollRate(0, 20)
-        panel.SetName("メインパネル")
+        panel.SetName(tr("メインパネル", "Main panel"))
         panel.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
         self.panel = panel
         root = wx.BoxSizer(wx.VERTICAL)
@@ -280,11 +286,11 @@ class MainFrame(wx.Frame):
         #   ＝名前より前に差し込める言葉は無い。だから名前自体に入れる。
         #   ラベルと SetName の両方を変える（どちらが読み上げ名に使われても
         #   同じになるように）。
-        status_label = f"OBSナビ バージョン {VERSION} の状態"
+        status_label = tr(f"OBSナビ バージョン {VERSION} の状態", f"OBS Navi version {VERSION} status")
         lbl_status = wx.StaticText(panel, label=status_label)
         self.status_text = wx.TextCtrl(
             panel,
-            value="未接続",
+            value=tr("未接続", "Not connected"),
             style=wx.TE_READONLY | wx.TE_MULTILINE,
             size=(-1, 56),
         )
@@ -307,7 +313,7 @@ class MainFrame(wx.Frame):
         #   変わると矢印の回数が変わってしまう。押したときに
         #   「すでに配信中です」と読むので足りる
         lbl_outputs = wx.StaticText(
-            panel, label="配信・録画（上下矢印で選んでEnterで実行）")
+            panel, label=tr("配信・録画（上下矢印で選んでEnterで実行）", "Stream and record (choose with Up and Down Arrow, press Enter to run)"))
         # ★実行する処理は窓内キーの対応表から引く（0.18.3）。同じ対応を
         #   ここにも書くと、片方だけ直したときに Enter とキーで違う処理が
         #   動く
@@ -321,7 +327,7 @@ class MainFrame(wx.Frame):
             labels.append(f"{label} {key}" if key else label)
             self._output_actions.append(actions[action_id])
         self.output_list = wx.ListBox(panel, choices=labels, size=(-1, 72))
-        self.output_list.SetName("配信・録画")
+        self.output_list.SetName(tr("配信・録画", "Stream and record"))
         # ★最初から先頭を選んでおく。選択の無いリストに Tab で入ると、
         #   スクリーンリーダーは項目を何も読まない
         self.output_list.SetSelection(0)
@@ -330,9 +336,9 @@ class MainFrame(wx.Frame):
         root.Add(lbl_outputs, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.output_list, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 8)
 
-        lbl_scenes = wx.StaticText(panel, label="シーン一覧（Enterで切り替え）")
+        lbl_scenes = wx.StaticText(panel, label=tr("シーン一覧（Enterで切り替え）", "Scene list (Enter to switch)"))
         self.scene_list = wx.ListBox(panel, size=(-1, 120))
-        self.scene_list.SetName("シーン一覧")
+        self.scene_list.SetName(tr("シーン一覧", "Scene list"))
         self.scene_list.Bind(wx.EVT_LISTBOX, self.on_scene_selected)
         root.Add(lbl_scenes, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.scene_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 8)
@@ -340,19 +346,20 @@ class MainFrame(wx.Frame):
         # シーン内ソースの表示・非表示（シーン一覧で選択中のシーンのソース）。
         # 「今画面に何が映っているか」を読み、Enterで出し入れする。
         self.lbl_items = wx.StaticText(
-            panel, label="ソース一覧（Enterで表示・非表示）")
+            panel, label=tr("ソース一覧（Enterで表示・非表示）", "Source list (Enter to show or hide)"))
         self.item_list = wx.ListBox(panel, size=(-1, 110))
-        self.item_list.SetName("ソース一覧")
+        self.item_list.SetName(tr("ソース一覧", "Source list"))
         self.item_list.Bind(wx.EVT_LISTBOX, self.on_item_selected)
         root.Add(self.lbl_items, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.item_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 8)
 
         lbl_inputs = wx.StaticText(
             panel,
-            label="音声入力一覧（Enterでミュート切り替え、"
-                  "左右キーで音量、Shift＋左右で大きく、F7で数値入力）")
+            label=tr("音声入力一覧（Enterでミュート切り替え、"
+                     "左右キーで音量、Shift＋左右で大きく、F7で数値入力）",
+               "Audio input list (Enter to toggle mute, Left and Right Arrow for volume, Shift+Left and Right for larger steps, F7 to enter a number)"))
         self.input_list = wx.ListBox(panel, size=(-1, 140))
-        self.input_list.SetName("音声入力一覧")
+        self.input_list.SetName(tr("音声入力一覧", "Audio input list"))
         self.input_list.Bind(wx.EVT_LISTBOX, self.on_input_selected)
         root.Add(lbl_inputs, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.input_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 8)
@@ -360,9 +367,9 @@ class MainFrame(wx.Frame):
         # フィルター一覧（音声入力一覧で選択中のソースのフィルター）。
         # OBS本体でスクリーンリーダーが読めない部分をここで扱う。
         self.lbl_filters = wx.StaticText(
-            panel, label="フィルター一覧（Enterでオン・オフ）")
+            panel, label=tr("フィルター一覧（Enterでオン・オフ）", "Filter list (Enter to turn on or off)"))
         self.filter_list = wx.ListBox(panel, size=(-1, 110))
-        self.filter_list.SetName("フィルター一覧")
+        self.filter_list.SetName(tr("フィルター一覧", "Filter list"))
         root.Add(self.lbl_filters, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.filter_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 8)
 
@@ -411,8 +418,9 @@ class MainFrame(wx.Frame):
         known = keymap.action_label(window_id or global_id)
         if known and known != label:
             self._key_problems.append(
-                f"メニューの「{label}」はキー操作の一覧では「{known}」です。"
-                "文言を揃えてください")
+                tr(f"メニューの「{label}」はキー操作の一覧では「{known}」です。"
+                   "文言を揃えてください",
+                   f"The menu item \"{label}\" is \"{known}\" in the key list. Make the wording match"))
         text = accel or keymap.menu_accel(self.config, window_id, global_id)
         item = menu.Append(wx.ID_ANY, f"{label}\t{text}" if text else label)
         self.Bind(wx.EVT_MENU, handler, item)
@@ -429,86 +437,86 @@ class MainFrame(wx.Frame):
 
         # --- 配信・録画 ---
         m = wx.Menu()
-        self._menu_item(m, "配信を開始", self.on_stream_start,
+        self._menu_item(m, tr("配信を開始", "Start streaming"), self.on_stream_start,
                         window_id="stream_start")
-        self._menu_item(m, "配信を停止", self.on_stream_stop,
+        self._menu_item(m, tr("配信を停止", "Stop streaming"), self.on_stream_stop,
                         window_id="stream_stop")
         m.AppendSeparator()
-        self._menu_item(m, "録画を開始", self.on_record_start,
+        self._menu_item(m, tr("録画を開始", "Start recording"), self.on_record_start,
                         window_id="record_start")
-        self._menu_item(m, "録画を停止", self.on_record_stop,
+        self._menu_item(m, tr("録画を停止", "Stop recording"), self.on_record_stop,
                         window_id="record_stop")
-        self._menu_item(m, "録画の一時停止・再開", self.on_record_pause,
+        self._menu_item(m, tr("録画の一時停止・再開", "Pause or resume recording"), self.on_record_pause,
                         window_id="record_pause")
-        self._menu_item(m, "チャプターを付ける", self.on_chapter_btn,
+        self._menu_item(m, tr("チャプターを付ける", "Add chapter"), self.on_chapter_btn,
                         global_id="chapter")
         m.AppendSeparator()
-        self._menu_item(m, "リプレイを保存", self.on_replay_btn,
+        self._menu_item(m, tr("リプレイを保存", "Save replay"), self.on_replay_btn,
                         global_id="replay")
-        self._menu_item(m, "仮想カメラの切り替え", self.on_vcam_btn,
+        self._menu_item(m, tr("仮想カメラの切り替え", "Toggle virtual camera"), self.on_vcam_btn,
                         global_id="virtual_cam")
         m.AppendSeparator()
-        self._menu_item(m, "録画設定の確認", self.on_rec_settings_btn)
+        self._menu_item(m, tr("録画設定の確認", "Check recording settings"), self.on_rec_settings_btn)
         # 録画で音を別トラックに分ける（docs/SETUP_MAC.md の手順6）。
         # ソースごとの割り当ては、そのソースの設定画面にある
-        self._menu_item(m, "録画のトラック設定", self.on_rec_tracks_btn)
-        self._menu_item(m, "最後の録画を開く", self.on_open_rec_btn)
+        self._menu_item(m, tr("録画のトラック設定", "Recording track settings"), self.on_rec_tracks_btn)
+        self._menu_item(m, tr("最後の録画を開く", "Open last recording"), self.on_open_rec_btn)
         m.AppendSeparator()
         # ★Escape では終了しない（0.16.0）。設定の画面を Escape で
         #   閉じたつもりが、もう1回押してアプリまで閉じかける事故が
         #   起きていた。終了は Alt+F4 かこの項目だけにしてある
-        exit_item = m.Append(wx.ID_EXIT, "終了\tAlt+F4")
+        exit_item = m.Append(wx.ID_EXIT, tr("終了\tAlt+F4", "Exit\tAlt+F4"))
         self.Bind(wx.EVT_MENU, self.on_exit_menu, exit_item)
-        bar.Append(m, "配信・録画(&S)")
+        bar.Append(m, tr("配信・録画(&S)", "&Stream and Record"))
 
         # --- シーン ---
         m = wx.Menu()
-        self._menu_item(m, "シーンを作る", self.on_scene_add_btn)
-        self._menu_item(m, "シーンの設定", self.on_scene_props_btn)
-        self._menu_item(m, "シーンを削除", self.on_scene_remove_btn)
+        self._menu_item(m, tr("シーンを作る", "Create scene"), self.on_scene_add_btn)
+        self._menu_item(m, tr("シーンの設定", "Scene settings"), self.on_scene_props_btn)
+        self._menu_item(m, tr("シーンを削除", "Delete scene"), self.on_scene_remove_btn)
         m.AppendSeparator()
-        self._menu_item(m, "シーン一覧の並び順", self.on_scene_order_btn)
-        bar.Append(m, "シーン(&C)")
+        self._menu_item(m, tr("シーン一覧の並び順", "Scene list order"), self.on_scene_order_btn)
+        bar.Append(m, tr("シーン(&C)", "S&cenes"))
 
         # --- ソース ---
         m = wx.Menu()
-        self._menu_item(m, "ソースを作る", self.on_source_add_btn)
-        self._menu_item(m, "ソースの設定", self.on_props_btn)
-        self._menu_item(m, "ソースを削除", self.on_source_remove_btn)
+        self._menu_item(m, tr("ソースを作る", "Create source"), self.on_source_add_btn)
+        self._menu_item(m, tr("ソースの設定", "Source settings"), self.on_props_btn)
+        self._menu_item(m, tr("ソースを削除", "Delete source"), self.on_source_remove_btn)
         m.AppendSeparator()
-        self._menu_item(m, "ゲーム切り替え", self.on_game_btn,
+        self._menu_item(m, tr("ゲーム切り替え", "Game switch"), self.on_game_btn,
                         window_id="game")
-        self._menu_item(m, "映像切り替え", self.on_video_btn,
+        self._menu_item(m, tr("映像切り替え", "Video switch"), self.on_video_btn,
                         window_id="video")
-        self._menu_item(m, "BGMの再生・一時停止", self.on_bgm_btn,
+        self._menu_item(m, tr("BGMの再生・一時停止", "Play or pause BGM"), self.on_bgm_btn,
                         window_id="bgm")
         m.AppendSeparator()
         # 重なり順（OBS本体が変わる）と、一覧の並び順（OBSナビの中だけ）は
         # 別のもの。取り違えないよう言葉で区別してある
-        self._menu_item(m, "ソースを前に出す（重なり順）",
+        self._menu_item(m, tr("ソースを前に出す（重なり順）", "Bring source forward (stacking order)"),
                         self.on_item_front_btn)
-        self._menu_item(m, "ソースを後ろに送る（重なり順）",
+        self._menu_item(m, tr("ソースを後ろに送る（重なり順）", "Send source backward (stacking order)"),
                         self.on_item_back_btn)
-        self._menu_item(m, "ソース一覧の並び順", self.on_item_order_btn)
-        bar.Append(m, "ソース(&O)")
+        self._menu_item(m, tr("ソース一覧の並び順", "Source list order"), self.on_item_order_btn)
+        bar.Append(m, tr("ソース(&O)", "S&ources"))
 
         # --- フィルター ---
         m = wx.Menu()
-        self._menu_item(m, "フィルターを追加", self.on_filter_add_btn)
-        self._menu_item(m, "フィルターの設定", self.on_filter_props_btn)
-        self._menu_item(m, "フィルターを削除", self.on_filter_remove_btn)
-        bar.Append(m, "フィルター(&F)")
+        self._menu_item(m, tr("フィルターを追加", "Add filter"), self.on_filter_add_btn)
+        self._menu_item(m, tr("フィルターの設定", "Filter settings"), self.on_filter_props_btn)
+        self._menu_item(m, tr("フィルターを削除", "Delete filter"), self.on_filter_remove_btn)
+        bar.Append(m, tr("フィルター(&F)", "&Filters"))
 
         # --- カメラ ---
         m = wx.Menu()
-        self._menu_item(m, "カメラの確認", self.on_camera_check_btn)
+        self._menu_item(m, tr("カメラの確認", "Check cameras"), self.on_camera_check_btn)
         # ★「カメラの切り替え」とは呼ばない。配信・録画メニューの
         #   「仮想カメラの切り替え」と紛らわしく、読み上げで聞き分け
         #   にくいため（別物：こちらは実機、あちらはOBSの出力）。
         #   キー一覧の説明とも同じ言い回しに揃えてある
-        self._menu_item(m, "カメラの有効・無効", self.on_camera_toggle_btn,
+        self._menu_item(m, tr("カメラの有効・無効", "Enable or disable camera"), self.on_camera_toggle_btn,
                         global_id="camera")
-        bar.Append(m, "カメラ(&K)")
+        bar.Append(m, tr("カメラ(&K)", "Camera (&K)"))
 
         # --- 音声 ---
         m = wx.Menu()
@@ -529,41 +537,45 @@ class MainFrame(wx.Frame):
                 accel="" if key in fixed_keys else key)
         if sr_items:
             m.AppendSeparator()
-        self._menu_item(m, "レベル読み上げ", self.on_levels_btn,
+        self._menu_item(m, tr("レベル読み上げ", "Read levels"), self.on_levels_btn,
                         window_id="levels")
-        self._menu_item(m, "音量を数値で入力", self.on_volume_btn,
+        self._menu_item(m, tr("音量を数値で入力", "Enter volume as a number"), self.on_volume_btn,
                         window_id="volume_prompt")
         m.AppendSeparator()
         # レベル読み上げ(F6)の出しかた。順番は並べ替えの画面、ミュートを
         # 飛ばすかはチェック項目。★設定の出どころは config.level_read の
         # 1か所だけにしてあり、ここは入口でしかない
-        self._menu_item(m, "レベル読み上げの順番", self.on_level_order_btn)
-        self._menu_item(m, "録画のトラック割り当てを読む",
+        self._menu_item(m, tr("レベル読み上げの順番", "Level readout order"), self.on_level_order_btn)
+        self._menu_item(m, tr("録画のトラック割り当てを読む", "Read recording track assignment"),
                         self.on_tracks_overview_btn)
         self.skip_muted_item = m.AppendCheckItem(
-            wx.ID_ANY, "ミュート中のソースを読み上げない")
+            wx.ID_ANY, tr("ミュート中のソースを読み上げない", "Do not read muted sources"))
         self.skip_muted_item.Check(
             bool(self.config.level_read.get("skip_muted", False)))
         self.Bind(wx.EVT_MENU, self.on_skip_muted_toggle, self.skip_muted_item)
-        bar.Append(m, "音声(&A)")
+        bar.Append(m, tr("音声(&A)", "&Audio"))
 
         # --- ツール ---
         m = wx.Menu()
-        self._menu_item(m, "状態読み上げ", self.on_state_btn,
+        self._menu_item(m, tr("状態読み上げ", "Read status"), self.on_state_btn,
                         window_id="state")
-        self._menu_item(m, "統計読み上げ", self.on_stats_btn,
+        self._menu_item(m, tr("統計読み上げ", "Read statistics"), self.on_stats_btn,
                         global_id="stats")
         m.AppendSeparator()
-        self._menu_item(m, "OBSに再接続", self.on_reconnect_btn)
-        bar.Append(m, "ツール(&T)")
+        self._menu_item(m, tr("OBSに再接続", "Reconnect to OBS"), self.on_reconnect_btn)
+        m.AppendSeparator()
+        # ★「表示の言語」は日本語と英語を併記する。読めない言語に
+        #   なってしまった人が、この項目だけは見つけられるように
+        self._menu_item(m, "表示の言語 (Language)", self.on_language)
+        bar.Append(m, tr("ツール(&T)", "&Tools"))
 
         # --- ヘルプ ---
         m = wx.Menu()
-        self._menu_item(m, "キー操作の一覧", self.on_help_keys,
+        self._menu_item(m, tr("キー操作の一覧", "Key list"), self.on_help_keys,
                         window_id="help")
-        about_item = m.Append(wx.ID_ABOUT, "OBSナビについて")
+        about_item = m.Append(wx.ID_ABOUT, tr("OBSナビについて", "About OBS Navi"))
         self.Bind(wx.EVT_MENU, self.on_about, about_item)
-        bar.Append(m, "ヘルプ(&H)")
+        bar.Append(m, tr("ヘルプ(&H)", "&Help"))
 
         self.SetMenuBar(bar)
 
@@ -591,7 +603,7 @@ class MainFrame(wx.Frame):
                     try:
                         wx.CallAfter(
                             speech.error,
-                            f"イベント処理でエラーが起きました（{name}: {exc}）")
+                            tr(f"イベント処理でエラーが起きました（{name}: {exc}）", f"An error occurred while handling an event ({name}: {exc})"))
                     except Exception:  # noqa: BLE001
                         pass
         return wrapped
@@ -601,10 +613,10 @@ class MainFrame(wx.Frame):
             # 起動直後の CallLater が、既に閉じたウィンドウで発火した場合
             return
         if self.conn.connected:
-            speech.speak("すでに接続しています")
+            speech.speak(tr("すでに接続しています", "Already connected"))
             return
         if announce_connecting:
-            speech.speak("OBSに接続しています")
+            speech.speak(tr("OBSに接続しています", "Connecting to OBS"))
         callbacks = [
             self.on_stream_state_changed,
             self.on_record_state_changed,
@@ -651,7 +663,7 @@ class MainFrame(wx.Frame):
         try:
             snap = commands.fetch_snapshot(self.conn.req)
         except Exception as exc:  # noqa: BLE001
-            self._handle_disconnect(f"OBSとの通信に失敗しました（{exc}）")
+            self._handle_disconnect(tr(f"OBSとの通信に失敗しました（{exc}）", f"Communication with OBS failed ({exc})"))
             return
         self.apply_snapshot(snap)
         if announce == "connected":
@@ -659,7 +671,7 @@ class MainFrame(wx.Frame):
             #   二重になる（0.17.1。_build_ui の説明を参照）
             # 起動して最初の1回だけは speech 側が割り込みを外す
             speech.speak(
-                f"OBSに接続しました。{speech_format.state_summary(snap)}",
+                tr(f"OBSに接続しました。{speech_format.state_summary(snap)}", f"Connected to OBS. {speech_format.state_summary(snap)}"),
                 interrupt=True)
 
     def _monitor_should_be_active(self) -> bool:
@@ -746,7 +758,7 @@ class MainFrame(wx.Frame):
     def _require_connection(self) -> bool:
         if self.conn.connected:
             return True
-        speech.error("OBSに接続していません。再接続を実行してください")
+        speech.error(tr("OBSに接続していません。再接続を実行してください", "Not connected to OBS. Run Reconnect"))
         return False
 
     @contextlib.contextmanager
@@ -804,8 +816,9 @@ class MainFrame(wx.Frame):
         except Exception:  # noqa: BLE001
             pass
         speech.warn(
-            "操作にはOBSナビの画面が必要です。画面を前に出しました。"
-            "もう一度押してください")
+            tr("操作にはOBSナビの画面が必要です。画面を前に出しました。"
+               "もう一度押してください",
+               "This action needs the OBS Navi window. The window was brought to the front. Press the key again"))
         return False
 
     def _restore_focus(self, target) -> None:
@@ -848,12 +861,12 @@ class MainFrame(wx.Frame):
             seen.add(msg)
             msgs.append(msg)
         if msgs:
-            wx.CallAfter(speech.warn, "。".join(msgs), False)
+            wx.CallAfter(speech.warn, tr("。", ". ").join(msgs), False)
 
     def _confirm(self, message: str) -> bool:
         with self.modal():
             dlg = wx.MessageDialog(
-                self, message, "確認",
+                self, message, tr("確認", "Confirm"),
                 wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION)
             try:
                 return dlg.ShowModal() == wx.ID_YES
@@ -922,8 +935,9 @@ class MainFrame(wx.Frame):
         # 修飾キーが無いと素のキーをシステム全体で奪ってしまうので登録しない
         if not tokens:
             self._key_problems.append(
-                "グローバルホットキーの修飾キーが設定されていないため無効です。"
-                "設定で Ctrl+Alt などを指定してください")
+                tr("グローバルホットキーの修飾キーが設定されていないため無効です。"
+                   "設定で Ctrl+Alt などを指定してください",
+                   "Global hotkeys are off because no modifier key is set. Specify Ctrl+Alt or similar in the settings"))
             return
 
         actions = self._hotkey_actions()
@@ -943,13 +957,13 @@ class MainFrame(wx.Frame):
                 #   キー一覧とメニューには出るのに押しても何も起きない、
                 #   という一番見つけにくい壊れ方なので、必ず報告する
                 self._key_problems.append(
-                    f"{desc}のキーは定義されていますが動作が実装されていません")
+                    tr(f"{desc}のキーは定義されていますが動作が実装されていません", f"The key for {desc} is defined but the action is not implemented"))
                 continue
             wxk = KEY_NAME_TO_WXK.get(key_name)
             if wxk is None:
                 # keymap が検証済みの今ここへは来ないはずだが、来たら黙らない
                 self._key_problems.append(
-                    f"{desc}のキー {key_name} を登録できません")
+                    tr(f"{desc}のキー {key_name} を登録できません", f"Could not register the key {key_name} for {desc}"))
                 continue
             modifiers = 0
             for t in key_tokens:
@@ -988,8 +1002,9 @@ class MainFrame(wx.Frame):
             other = [f for f in failed if f not in self_dupes]
             if other:
                 self._key_problems.append(
-                    "次のグローバルホットキーは登録できませんでした"
-                    "（他のアプリと競合の可能性）: " + "、".join(other))
+                    tr("次のグローバルホットキーは登録できませんでした"
+                       "（他のアプリと競合の可能性）: ",
+                       "The following global hotkeys could not be registered (they may conflict with another app): ") + tr("、", ", ").join(other))
 
     def _announce_key_problems(self) -> None:
         """キー割り当ての問題を起動時に1回だけまとめて読む。
@@ -1008,16 +1023,17 @@ class MainFrame(wx.Frame):
             #   保存されないので、起動時に必ず伝える（変えた直後は
             #   成功したように見え、再起動して初めて消えていると分かる）
             problems.append(
-                "設定ファイルを読み込めなかったため、既定の設定で動いて"
-                "います。このまま設定を変えても保存されません。"
-                "obs_navi_config.json を確かめてください")
+                tr("設定ファイルを読み込めなかったため、既定の設定で動いて"
+                   "います。このまま設定を変えても保存されません。"
+                   "obs_navi_config.json を確かめてください",
+                   "The settings file could not be read, so OBS Navi is running with default settings. Changes you make now will not be saved. Check obs_navi_config.json"))
         problems.extend(keymap.invalid_key_warnings(self.config))
         dupes = keymap.duplicate_bindings(self.config)
         if dupes:
             # ★「後の方は効きません」のような一般則で言わない。段ごとに
             #   勝つ側が違うので、どちらが効くかは keymap が文ごとに言う
             problems.append(
-                "同じキーに2つ割り当てられています: " + "、".join(dupes))
+                tr("同じキーに2つ割り当てられています: ", "Two actions are assigned to the same key: ") + tr("、", ", ").join(dupes))
         problems.extend(self._key_problems)
         self._key_problems = []
         if not problems:
@@ -1025,7 +1041,7 @@ class MainFrame(wx.Frame):
         # ★起動時の警告も割り込まない。ここで割り込むと、状態欄の名前
         #   （バージョン）や接続の読み上げを途中で切ってしまう。
         #   この関数は起動時にしか呼ばれないので常に後ろへ並べる
-        wx.CallLater(1400, speech.warn, "。".join(problems), False)
+        wx.CallLater(1400, speech.warn, tr("。", ". ").join(problems), False)
 
     def _run_hotkey_action(self, action, action_id: str) -> None:
         """グローバルホットキーから呼ばれる処理を実行する。
@@ -1044,7 +1060,7 @@ class MainFrame(wx.Frame):
         read_only = action in (self.announce_state, self.announce_levels,
                                self.announce_stats)
         if self._modal_depth > 0 and not read_only:
-            speech.speak("今は別の画面を開いています", interrupt=True)
+            speech.speak(tr("今は別の画面を開いています", "Another dialog is open now"), interrupt=True)
             return
         try:
             if isinstance(action, tuple) and action:
@@ -1059,7 +1075,7 @@ class MainFrame(wx.Frame):
                 action()
         except Exception as exc:  # noqa: BLE001
             # ホットキー経由の例外はどこにも出ないまま無反応になるので拾う
-            speech.error(f"操作に失敗しました（{exc}）")
+            speech.error(tr(f"操作に失敗しました（{exc}）", f"The operation failed ({exc})"))
 
     def unregister_global_hotkeys(self) -> None:
         """登録済みのグローバルホットキーをすべて解除する。"""
@@ -1074,7 +1090,7 @@ class MainFrame(wx.Frame):
 
     def announce_state(self) -> None:
         if not self.conn.connected:
-            speech.speak("OBSに接続していません", interrupt=True)
+            speech.speak(tr("OBSに接続していません", "Not connected to OBS"), interrupt=True)
             return
         self.refresh_from_obs()
         if self.conn.connected:
@@ -1119,7 +1135,7 @@ class MainFrame(wx.Frame):
         names = list(names)
         saved = list(saved)
         if not names and not saved:
-            speech.warn("並べ替えられるものがありません")
+            speech.warn(tr("並べ替えられるものがありません", "There is nothing to reorder"))
             return None
         order = None
         with self.modal():
@@ -1168,9 +1184,9 @@ class MainFrame(wx.Frame):
 
     def open_level_order(self) -> None:
         """レベル読み上げ(F6)の順番を並べ替える。"""
-        title = "レベル読み上げの順番"
+        title = tr("レベル読み上げの順番", "Level readout order")
         order = self._edit_order(
-            title, "読み上げる順番",
+            title, tr("読み上げる順番", "Readout order"),
             self._input_names,
             self.config.level_read.get("order", ()), by_name=True)
         if order is None:
@@ -1190,9 +1206,9 @@ class MainFrame(wx.Frame):
         （並べ替えの要求が用意されていない）。ここで変えられるのは
         OBSナビの一覧の並びだけ。
         """
-        title = "シーン一覧の並び順"
+        title = tr("シーン一覧の並び順", "Scene list order")
         order = self._edit_order(
-            title, "シーン一覧の順番",
+            title, tr("シーン一覧の順番", "Scene list order"),
             self.snapshot.scenes,
             self.config.list_order.get("scenes", ()))
         if order is None:
@@ -1223,7 +1239,7 @@ class MainFrame(wx.Frame):
         # ★渡すのは「OBSから来た並び」。表示順（並べ替え済み）を渡すと、
         #   画面の「OBSと同じ順に戻す」がカスタム順を復元してしまい、
         #   本当のOBSの重なり順へ戻す手段が無くなる
-        title = "ソース一覧の並び順"
+        title = tr("ソース一覧の並び順", "Source list order")
         names = [n for n in self._item_obs_names if n]
         saved = list(self.config.list_order.get("items", ()))
         # ★「今あるもの」は全シーンで数える。この設定は全シーンで1つ
@@ -1231,10 +1247,10 @@ class MainFrame(wx.Frame):
         #   ソースが「今はありません」と読まれ、戻すと消えてしまう。
         #   シーンの数だけ問い合わせるので、無言で待たせないよう先に断る
         if self.conn.connected and len(self.snapshot.scenes) > 1:
-            speech.speak("ソース一覧の並び順を開きます", interrupt=True)
+            speech.speak(tr("ソース一覧の並び順を開きます", "Opening the source list order"), interrupt=True)
         present = self._all_item_names() or set(saved)
         order = self._edit_order(
-            title, "ソース一覧の順番", names, saved, present=present)
+            title, tr("ソース一覧の順番", "Source list order"), names, saved, present=present)
         if order is None:
             return
         self._apply_order(self.config.list_order, "items", order, title,
@@ -1273,7 +1289,7 @@ class MainFrame(wx.Frame):
         item_id = self._selected_item_id()
         if not scene or item_id is None:
             speech.speak(
-                "ソース一覧でソースを選んでから実行してください",
+                tr("ソース一覧でソースを選んでから実行してください", "Select a source in the source list first"),
                 interrupt=True)
             return
         ok, items = commands.fetch_scene_items_checked(self.conn.req, scene)
@@ -1282,12 +1298,13 @@ class MainFrame(wx.Frame):
             #   ソースはあるのに「見つかりません」と言うと、利用者は
             #   ソースを探し始めてしまう（本当の原因は接続）。一覧も消さない
             speech.error(
-                "ソースの一覧を取得できませんでした。"
-                "OBSとの接続を確かめてください")
+                tr("ソースの一覧を取得できませんでした。"
+                   "OBSとの接続を確かめてください",
+                   "Could not get the list of sources. Check the connection to OBS"))
             return
         plan = video.plan_layer_move(items, item_id, forward)
         if plan is None:
-            speech.error("ソースが見つかりません")
+            speech.error(tr("ソースが見つかりません", "Source not found"))
             self.refresh_item_list()
             return
         if plan.new_index < 0:
@@ -1299,7 +1316,7 @@ class MainFrame(wx.Frame):
             commands.set_scene_item_index(
                 self.conn.req, scene, item_id, plan.new_index)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"重なり順を変えられませんでした（{exc}）")
+            speech.error(tr(f"重なり順を変えられませんでした（{exc}）", f"Could not change the stacking order ({exc})"))
             return
         # ★ここで作り直さない。OBS が SceneItemListReindexed を返すので
         #   on_scene_item_list_reindexed が同じことをする。両方やると
@@ -1315,7 +1332,7 @@ class MainFrame(wx.Frame):
         self.config.level_read["skip_muted"] = skip
         if not self._save_config():
             speech.error(speech_format.config_save_failed_speech(
-                "ミュート中のソースの設定"))
+                tr("ミュート中のソースの設定", "Setting for muted sources")))
             return
         speech.speak(speech_format.skip_muted_speech(skip), interrupt=True)
 
@@ -1335,21 +1352,22 @@ class MainFrame(wx.Frame):
                 return
             target = self._source_target_label(source)
             if self._confirm(
-                f"入力「{name}」がありません。"
-                f"{target}の音声を配信に乗せるための入力を作成しますか？"
+                tr(f"入力「{name}」がありません。"
+                   f"{target}の音声を配信に乗せるための入力を作成しますか？",
+                   f"There is no input \"{name}\". Create an input to send the audio of {target} to the stream?")
             ):
                 self.create_sr_source(source)
             return
         try:
             commands.toggle_mute(self.conn.req, name)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"切り替えに失敗しました（{exc}）")
+            speech.error(tr(f"切り替えに失敗しました（{exc}）", f"Toggle failed ({exc})"))
 
     def _source_target_label(self, source: dict) -> str:
         """ソースの捕捉対象を表す短い文字列（確認・警告用）。"""
         if source.get("method") == "device":
-            return source.get("device_match", "対象デバイス")
-        return source.get("exe", "対象アプリ")
+            return source.get("device_match", tr("対象デバイス", "device"))
+        return source.get("exe", tr("対象アプリ", "app"))
 
     def create_sr_source(self, source: dict) -> None:
         """ソースの方式に応じてスクリーンリーダー音声入力を作成する。"""
@@ -1361,13 +1379,13 @@ class MainFrame(wx.Frame):
         #   「Delete をもう一度押すと」のような、押しても効かない案内に
         #   なる。キーが無いときはメニューから辿れることを言う
         key = keymap.sr_key_label(self.config, name)
-        again = f"{key}をもう一度押すと" if key else "音声メニューでもう一度選ぶと"
-        retry = (f"もう一度 {key} を押してください" if key
-                 else "音声メニューからもう一度選んでください")
+        again = tr(f"{key}をもう一度押すと", f"Press {key} again") if key else tr("音声メニューでもう一度選ぶと", "Choose it again from the Audio menu")
+        retry = (tr(f"もう一度 {key} を押してください", f"press {key} again") if key
+                 else tr("音声メニューからもう一度選んでください", "choose it again from the Audio menu"))
         target = self._source_target_label(source)
         scene = self.snapshot.current_scene
         if not scene:
-            speech.error("現在のシーンが取得できないため作成できません")
+            speech.error(tr("現在のシーンが取得できないため作成できません", "Cannot create it because the current scene is unknown"))
             return
         # 作成に伴うミュートイベントの読み上げを1回抑止する
         self._sr_setup_pending.add(name)
@@ -1375,13 +1393,14 @@ class MainFrame(wx.Frame):
             value = setup.create_sr_source_input(self.conn.req, scene, source)
         except Exception as exc:  # noqa: BLE001
             self._sr_setup_pending.discard(name)
-            speech.error(f"入力の作成に失敗しました（{exc}）")
+            speech.error(tr(f"入力の作成に失敗しました（{exc}）", f"Could not create the input ({exc})"))
             return
         self.refresh_from_obs()
         if value:
             speech.speak(
-                f"{name}の入力を作成しました。今はミュート状態です。"
-                f"{again}配信に乗せます", interrupt=True)
+                tr(f"{name}の入力を作成しました。今はミュート状態です。"
+                   f"{again}配信に乗せます",
+                   f"Created the input for {name}. It is muted now. {again} to send it to the stream"), interrupt=True)
             # 万一ミュートイベントが届かなくても抑止フラグを残さない
             # （残ると、次の手動トグル1回ぶんの読み上げが無言になる）
             wx.CallLater(3000, self._sr_setup_pending.discard, name)
@@ -1390,12 +1409,14 @@ class MainFrame(wx.Frame):
             self._sr_setup_pending.discard(name)
             if source.get("method") == "device":
                 speech.warn(
-                    f"録音デバイス {target} が見つかりませんでした。"
-                    f"仮想ケーブルが有効か確認してから、{retry}")
+                    tr(f"録音デバイス {target} が見つかりませんでした。"
+                       f"仮想ケーブルが有効か確認してから、{retry}",
+                       f"The recording device {target} was not found. Check that the virtual cable is enabled, then {retry}"))
             else:
                 speech.warn(
-                    f"対象の {target} が見つかりませんでした。"
-                    f"{target} のアプリを起動してから、{retry}")
+                    tr(f"対象の {target} が見つかりませんでした。"
+                       f"{target} のアプリを起動してから、{retry}",
+                       f"The target {target} was not found. Start the {target} app, then {retry}"))
 
 
     def _confirm_by_repeat(self, action_id: str, what: str) -> bool:
@@ -1408,67 +1429,67 @@ class MainFrame(wx.Frame):
             # ★決まったらすぐ言う（0.18.3）。黙っていると1回目の案内が
             #   流れ続け、OBS から開始の知らせが届くまで（Twitch への接続で
             #   数秒）効いたか分からない。toggle_camera と同じ理由
-            speech.speak(f"{what}します", interrupt=True)
+            speech.speak(tr(f"{what}します", f"{what}, confirmed"), interrupt=True)
             return True
         # ★案内は短く（0.18.3）。キー名と秒数を入れた 0.18.2 の案内は
         #   読み終えるのに6〜7秒かかり、聞き終えたときには猶予が切れて
         #   いた（レビューで判明）。押したキーは本人が知っている
-        speech.speak(f"もう一度押すと{what}します", interrupt=True)
+        speech.speak(tr(f"もう一度押すと{what}します", f"Press again to {what.lower()}"), interrupt=True)
         return False
 
     def start_stream(self, from_global: bool = False) -> None:
         if not self._require_connection():
             return
         if self.snapshot.streaming:
-            speech.speak("すでに配信中です")
+            speech.speak(tr("すでに配信中です", "Already streaming"))
             return
         if from_global:
-            if not self._confirm_by_repeat("stream_start", "配信を開始"):
+            if not self._confirm_by_repeat("stream_start", tr("配信を開始", "Start streaming")):
                 return
-        elif not self._confirm("配信を開始しますか？"):
+        elif not self._confirm(tr("配信を開始しますか？", "Start streaming?")):
             return
         try:
             commands.start_stream(self.conn.req)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"配信開始に失敗しました（{exc}）")
+            speech.error(tr(f"配信開始に失敗しました（{exc}）", f"Could not start streaming ({exc})"))
 
     def stop_stream(self, from_global: bool = False) -> None:
         if not self._require_connection():
             return
         if not self.snapshot.streaming:
-            speech.speak("配信は停止しています")
+            speech.speak(tr("配信は停止しています", "Streaming is stopped"))
             return
         if from_global:
-            if not self._confirm_by_repeat("stream_stop", "配信を停止"):
+            if not self._confirm_by_repeat("stream_stop", tr("配信を停止", "Stop streaming")):
                 return
-        elif not self._confirm("配信を停止しますか？"):
+        elif not self._confirm(tr("配信を停止しますか？", "Stop streaming?")):
             return
         try:
             commands.stop_stream(self.conn.req)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"配信停止に失敗しました（{exc}）")
+            speech.error(tr(f"配信停止に失敗しました（{exc}）", f"Could not stop streaming ({exc})"))
 
     def start_record(self) -> None:
         if not self._require_connection():
             return
         if self.snapshot.recording:
-            speech.speak("すでに録画中です")
+            speech.speak(tr("すでに録画中です", "Already recording"))
             return
         try:
             commands.start_record(self.conn.req)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"録画開始に失敗しました（{exc}）")
+            speech.error(tr(f"録画開始に失敗しました（{exc}）", f"Could not start recording ({exc})"))
 
     def stop_record(self) -> None:
         if not self._require_connection():
             return
         if not self.snapshot.recording:
-            speech.speak("録画は停止しています")
+            speech.speak(tr("録画は停止しています", "Recording is stopped"))
             return
         try:
             commands.stop_record(self.conn.req)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"録画停止に失敗しました（{exc}）")
+            speech.error(tr(f"録画停止に失敗しました（{exc}）", f"Could not stop recording ({exc})"))
 
     def activate_selected_scene(self) -> None:
         """シーン一覧で選択中のシーンへ切り替える。"""
@@ -1479,12 +1500,12 @@ class MainFrame(wx.Frame):
             return
         name = self.scene_list.GetString(idx)
         if name == self.snapshot.current_scene:
-            speech.speak(f"すでにシーン {name} です", interrupt=True)
+            speech.speak(tr(f"すでにシーン {name} です", f"Already on scene {name}"), interrupt=True)
             return
         try:
             commands.set_scene(self.conn.req, name)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"シーン切り替えに失敗しました（{exc}）")
+            speech.error(tr(f"シーン切り替えに失敗しました（{exc}）", f"Could not switch scenes ({exc})"))
 
     def toggle_selected_input(self) -> None:
         """音声入力一覧で選択中の入力のミュートを切り替える。"""
@@ -1497,7 +1518,7 @@ class MainFrame(wx.Frame):
         try:
             commands.toggle_mute(self.conn.req, name)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"ミュート切り替えに失敗しました（{exc}）")
+            speech.error(tr(f"ミュート切り替えに失敗しました（{exc}）", f"Could not toggle mute ({exc})"))
 
     # ------------------------------------------------------------
     # 音量
@@ -1523,7 +1544,7 @@ class MainFrame(wx.Frame):
             return
         current = commands.fetch_volume_db(self.conn.req, name)
         if current is None:
-            speech.error(f"{name} の音量が取得できません")
+            speech.error(tr(f"{name} の音量が取得できません", f"Could not get the volume of {name}"))
             return
         target = volume.next_db(current, delta_db, self.config.volume_step_db)
         if target == current:
@@ -1532,10 +1553,10 @@ class MainFrame(wx.Frame):
             # 端に着いているとは限らない（設定の刻みが0など）ので決めつけない。
             if current >= volume.VOLUME_MAX_DB:
                 speech.speak(
-                    f"{name} はこれ以上上げられません。最大です", interrupt=True)
+                    tr(f"{name} はこれ以上上げられません。最大です", f"{name} cannot go any higher. It is at maximum"), interrupt=True)
             elif current <= volume.VOLUME_MIN_DB:
                 speech.speak(
-                    f"{name} はこれ以上下げられません。最小です", interrupt=True)
+                    tr(f"{name} はこれ以上下げられません。最小です", f"{name} cannot go any lower. It is at minimum"), interrupt=True)
             else:
                 speech.speak(
                     speech_format.volume_speech(name, current), interrupt=True)
@@ -1543,7 +1564,7 @@ class MainFrame(wx.Frame):
         try:
             commands.set_volume_db(self.conn.req, name, target)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"音量の変更に失敗しました（{exc}）")
+            speech.error(tr(f"音量の変更に失敗しました（{exc}）", f"Could not change the volume ({exc})"))
 
     def announce_selected_volume(self) -> None:
         """選択中の入力の名前と音量を読む（対象を切り替えたときに使う）。"""
@@ -1551,11 +1572,11 @@ class MainFrame(wx.Frame):
             return
         name = self._selected_input_name()
         if not name:
-            speech.speak("音声入力がありません", interrupt=True)
+            speech.speak(tr("音声入力がありません", "There are no audio inputs"), interrupt=True)
             return
         current = commands.fetch_volume_db(self.conn.req, name)
         if current is None:
-            speech.speak(f"{name} 音量不明", interrupt=True)
+            speech.speak(tr(f"{name} 音量不明", f"{name} volume unknown"), interrupt=True)
             return
         speech.speak(speech_format.volume_speech(name, current), interrupt=True)
 
@@ -1567,7 +1588,7 @@ class MainFrame(wx.Frame):
         """
         count = self.input_list.GetCount()
         if count == 0:
-            speech.speak("音声入力がありません", interrupt=True)
+            speech.speak(tr("音声入力がありません", "There are no audio inputs"), interrupt=True)
             return
         idx = self.input_list.GetSelection()
         if idx == wx.NOT_FOUND:
@@ -1593,20 +1614,21 @@ class MainFrame(wx.Frame):
             return
         name = self._selected_input_name()
         if not name:
-            speech.speak("音声入力がありません", interrupt=True)
+            speech.speak(tr("音声入力がありません", "There are no audio inputs"), interrupt=True)
             return
         current = commands.fetch_volume_db(self.conn.req, name)
         if current is None:
-            speech.error(f"{name} の音量が取得できません")
+            speech.error(tr(f"{name} の音量が取得できません", f"Could not get the volume of {name}"))
             return
         message = (
-            f"{name} の音量をデシベルで入力してください。\n"
-            f"今は {speech_format.fmt_volume_db(current)} です。\n"
-            f"入力できる範囲は {int(volume.VOLUME_MIN_DB)} から "
-            f"{int(volume.VOLUME_MAX_DB)} までです。")
+            tr(f"{name} の音量をデシベルで入力してください。\n"
+               f"今は {speech_format.fmt_volume_db(current)} です。\n"
+               f"入力できる範囲は {int(volume.VOLUME_MIN_DB)} から "
+               f"{int(volume.VOLUME_MAX_DB)} までです。",
+               f"Enter the volume of {name} in decibels.\nIt is {speech_format.fmt_volume_db(current)} now.\nYou can enter from {int(volume.VOLUME_MIN_DB)} to {int(volume.VOLUME_MAX_DB)}."))
         with self.modal():
             dlg = wx.TextEntryDialog(
-                self, message, "音量の設定", value=str(round(current, 1)))
+                self, message, tr("音量の設定", "Volume"), value=str(round(current, 1)))
             try:
                 if dlg.ShowModal() != wx.ID_OK:
                     return
@@ -1616,8 +1638,9 @@ class MainFrame(wx.Frame):
         target = volume.parse_db_input(text)
         if target is None:
             speech.error(
-                "数値として読み取れませんでした。5 や マイナス10 のように"
-                "入力してください")
+                tr("数値として読み取れませんでした。5 や マイナス10 のように"
+                   "入力してください",
+                   "Could not read that as a number. Enter something like 5 or -10"))
             return
         if target == current:
             speech.speak(
@@ -1626,7 +1649,7 @@ class MainFrame(wx.Frame):
         try:
             commands.set_volume_db(self.conn.req, name, target)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"音量の変更に失敗しました（{exc}）")
+            speech.error(tr(f"音量の変更に失敗しました（{exc}）", f"Could not change the volume ({exc})"))
 
     # ------------------------------------------------------------
     # フィルター（ソース一覧・音声入力一覧で選択中のソースのフィルター）
@@ -1656,7 +1679,7 @@ class MainFrame(wx.Frame):
         if not name or not self.conn.connected:
             self._filter_names = []
             self.filter_list.Set([])
-            self.lbl_filters.SetLabel("フィルター一覧（Enterでオン・オフ）")
+            self.lbl_filters.SetLabel(tr("フィルター一覧（Enterでオン・オフ）", "Filter list (Enter to turn on or off)"))
             return
         # ★変数名を filters にしない。core.filters モジュールを
         #   関数の中で隠してしまう（同名のローカルがあると、その関数の
@@ -1682,11 +1705,11 @@ class MainFrame(wx.Frame):
             else:
                 self.filter_list.SetSelection(0)
         self.lbl_filters.SetLabel(
-            f"{name} のフィルター一覧（Enterでオン・オフ）")
+            tr(f"{name} のフィルター一覧（Enterでオン・オフ）", f"Filter list of {name} (Enter to turn on or off)"))
         if announce:
             if found:
                 speech.speak(
-                    f"{name} のフィルター {len(found)} 件", interrupt=True)
+                    tr(f"{name} のフィルター {len(found)} 件", f"{len(found)} filters on {name}"), interrupt=True)
             else:
                 # 足せることまで言う（0.11.0 で追加できるようになったため、
                 # 「ありません」で終わると打つ手が無いように聞こえる）
@@ -1714,19 +1737,20 @@ class MainFrame(wx.Frame):
         if not ok:
             # ★接続の問題を「見つかりません」と言わない（一覧も消さない）
             speech.error(
-                "フィルターの一覧を取得できませんでした。"
-                "OBSとの接続を確かめてください")
+                tr("フィルターの一覧を取得できませんでした。"
+                   "OBSとの接続を確かめてください",
+                   "Could not get the list of filters. Check the connection to OBS"))
             return
         current = next((f for f in found if f.name == fname), None)
         if current is None:
-            speech.error("フィルターが見つかりません")
+            speech.error(tr("フィルターが見つかりません", "Filter not found"))
             self.refresh_filter_list()
             return
         try:
             commands.set_filter_enabled(
                 self.conn.req, source, fname, not current.enabled)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"フィルターの切り替えに失敗しました（{exc}）")
+            speech.error(tr(f"フィルターの切り替えに失敗しました（{exc}）", f"Could not toggle the filter ({exc})"))
 
     def on_input_selected(self, _evt: wx.CommandEvent) -> None:
         """音声入力一覧で選択を動かしたら、フィルター一覧を追従させる。"""
@@ -1805,8 +1829,8 @@ class MainFrame(wx.Frame):
             return True
         source = self._filter_source
         speech.warn(
-            f"{source} のフィルター一覧に切り替えました。選び直してください"
-            if source else "フィルターの対象が変わりました。選び直してください")
+            tr(f"{source} のフィルター一覧に切り替えました。選び直してください", f"Switched to the filter list of {source}. Select again")
+            if source else tr("フィルターの対象が変わりました。選び直してください", "The filter target changed. Select again"))
         return False
 
     # ------------------------------------------------------------
@@ -1841,10 +1865,10 @@ class MainFrame(wx.Frame):
         fname = self._selected_filter_name()
         if not source or not fname:
             speech.speak(
-                "フィルター一覧でフィルターを選んでから実行してください",
+                tr("フィルター一覧でフィルターを選んでから実行してください", "Select a filter in the filter list first"),
                 interrupt=True)
             return
-        speech.speak(f"{fname} の設定を開きます", interrupt=True)
+        speech.speak(tr(f"{fname} の設定を開きます", f"Opening the settings of {fname}"), interrupt=True)
         with self.modal():
             dlg = prop_dialog.FilterPropDialog(self, source, fname)
             try:
@@ -1872,7 +1896,7 @@ class MainFrame(wx.Frame):
             commands.apply_filter_settings(
                 self.conn.req, source, filter_name, patch)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"フィルターの設定に失敗しました（{exc}）")
+            speech.error(tr(f"フィルターの設定に失敗しました（{exc}）", f"Could not change the filter settings ({exc})"))
             return False
         if spec is None:
             return True
@@ -1903,7 +1927,7 @@ class MainFrame(wx.Frame):
         source = self._filter_target()
         if not source:
             speech.speak(
-                "音声入力一覧でソースを選んでから実行してください",
+                tr("音声入力一覧でソースを選んでから実行してください", "Select a source in the audio input list first"),
                 interrupt=True)
             return
         # ★追加できるのは音声フィルターだけ。音を持たないソースに
@@ -1912,9 +1936,10 @@ class MainFrame(wx.Frame):
         #   映像フィルターの追加は未対応
         if source not in self._input_names:
             speech.warn(
-                f"{source} は音声を持たないソースです。"
-                "追加できるのは音声フィルターだけなので、ここでは足せません。"
-                "既にあるフィルターの確認・オン・オフ・削除はできます")
+                tr(f"{source} は音声を持たないソースです。"
+                   "追加できるのは音声フィルターだけなので、ここでは足せません。"
+                   "既にあるフィルターの確認・オン・オフ・削除はできます",
+                   f"{source} has no audio. Only audio filters can be added here, so none can be added to it. You can still check, toggle, and delete its existing filters"))
             return
         if not self._ready_for_dialog():
             return
@@ -1924,8 +1949,8 @@ class MainFrame(wx.Frame):
                     if k.kind == filters.RECOMMENDED_FIRST), 0)
         with self.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"{source} に追加するフィルター、{len(rows)}件",
-                "フィルターを追加", rows)
+                self, tr(f"{source} に追加するフィルター、{len(rows)}件", f"{len(rows)} filters you can add to {source}"),
+                tr("フィルターを追加", "Add filter"), rows)
             try:
                 if 0 <= sel < len(rows):
                     dlg.SetSelection(sel)
@@ -1946,7 +1971,7 @@ class MainFrame(wx.Frame):
         try:
             commands.create_filter(self.conn.req, source, name, info.kind)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"フィルターの追加に失敗しました（{exc}）")
+            speech.error(tr(f"フィルターの追加に失敗しました（{exc}）", f"Could not add the filter ({exc})"))
             return
         self.refresh_filter_list()
         # 作られたことを実際に確かめてから言う（作れない種別があるため）
@@ -1954,8 +1979,9 @@ class MainFrame(wx.Frame):
                 commands.fetch_source_filters(self.conn.req, source)]
         if name not in made:
             speech.warn(
-                f"{info.label} を追加できませんでした。"
-                "OBSがこの種類のフィルターを作れないようです")
+                tr(f"{info.label} を追加できませんでした。"
+                   "OBSがこの種類のフィルターを作れないようです",
+                   f"Could not add {info.label}. OBS seems unable to create this type of filter"))
             return
         if name in self._filter_names:
             self.filter_list.SetSelection(self._filter_names.index(name))
@@ -1972,20 +1998,20 @@ class MainFrame(wx.Frame):
         fname = self._selected_filter_name()
         if not source or not fname:
             speech.speak(
-                "フィルター一覧でフィルターを選んでから実行してください",
+                tr("フィルター一覧でフィルターを選んでから実行してください", "Select a filter in the filter list first"),
                 interrupt=True)
             return
         if not self._ready_for_dialog():
             return
         # 削除は取り消せないので必ず確認する
         if not self._confirm(
-            f"{source} のフィルター「{fname}」を削除しますか？"
+            tr(f"{source} のフィルター「{fname}」を削除しますか？", f"Delete the filter \"{fname}\" of {source}?")
         ):
             return
         try:
             commands.remove_filter(self.conn.req, source, fname)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"フィルターの削除に失敗しました（{exc}）")
+            speech.error(tr(f"フィルターの削除に失敗しました（{exc}）", f"Could not delete the filter ({exc})"))
             return
         self.refresh_filter_list()
         speech.speak(
@@ -2018,7 +2044,7 @@ class MainFrame(wx.Frame):
             self._item_names = {}
             self._item_obs_names = []
             self.item_list.Set([])
-            self.lbl_items.SetLabel("ソース一覧（Enterで表示・非表示）")
+            self.lbl_items.SetLabel(tr("ソース一覧（Enterで表示・非表示）", "Source list (Enter to show or hide)"))
             if sync_filters:
                 self._sync_filter_target()
             return
@@ -2055,9 +2081,9 @@ class MainFrame(wx.Frame):
             else:
                 self.item_list.SetSelection(0)
         self.lbl_items.SetLabel(
-            f"{scene} のソース一覧（Enterで表示・非表示）")
+            tr(f"{scene} のソース一覧（Enterで表示・非表示）", f"Source list of {scene} (Enter to show or hide)"))
         if announce:
-            speech.speak(f"{scene} のソース {len(items)} 件", interrupt=True)
+            speech.speak(tr(f"{scene} のソース {len(items)} 件", f"{len(items)} sources in {scene}"), interrupt=True)
         # 選択が動いていれば（シーン切り替え・ソースの増減など）、
         # フィルター一覧の対象も合わせる
         if sync_filters:
@@ -2080,19 +2106,20 @@ class MainFrame(wx.Frame):
             # ★接続の問題を「ソースが見つかりません」と言わない
             #   （言うと一覧まで消えて、探す先を間違える）
             speech.error(
-                "ソースの一覧を取得できませんでした。"
-                "OBSとの接続を確かめてください")
+                tr("ソースの一覧を取得できませんでした。"
+                   "OBSとの接続を確かめてください",
+                   "Could not get the list of sources. Check the connection to OBS"))
             return
         current = next((it for it in items if it.item_id == item_id), None)
         if current is None:
-            speech.error("ソースが見つかりません")
+            speech.error(tr("ソースが見つかりません", "Source not found"))
             self.refresh_item_list()
             return
         try:
             commands.set_scene_item_enabled(
                 self.conn.req, scene, item_id, not current.enabled)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"表示の切り替えに失敗しました（{exc}）")
+            speech.error(tr(f"表示の切り替えに失敗しました（{exc}）", f"Could not show or hide the source ({exc})"))
 
     def on_scene_selected(self, _evt: wx.CommandEvent) -> None:
         """シーン一覧の選択が変わったらソース一覧を追従させる。
@@ -2119,19 +2146,19 @@ class MainFrame(wx.Frame):
         try:
             commands.toggle_virtual_cam(self.conn.req)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"仮想カメラの切り替えに失敗しました（{exc}）")
+            speech.error(tr(f"仮想カメラの切り替えに失敗しました（{exc}）", f"Could not toggle the virtual camera ({exc})"))
 
     def toggle_record_pause(self) -> None:
         """録画の一時停止・再開を切り替える。"""
         if not self._require_connection():
             return
         if not self.snapshot.recording:
-            speech.speak("録画していません", interrupt=True)
+            speech.speak(tr("録画していません", "Not recording"), interrupt=True)
             return
         try:
             commands.toggle_record_pause(self.conn.req)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"録画の一時停止に失敗しました（{exc}）")
+            speech.error(tr(f"録画の一時停止に失敗しました（{exc}）", f"Could not pause recording ({exc})"))
 
     def save_replay(self) -> None:
         """リプレイバッファを保存する（直近の数十秒をファイルへ）。
@@ -2149,14 +2176,16 @@ class MainFrame(wx.Frame):
             wx.CallLater(REPLAY_SETTLE_MS, self._settle_replay)
         except commands.ReplayBufferStarting:
             speech.speak(
-                "リプレイバッファを起動しました。数十秒待ってから、"
-                "もう一度リプレイ保存を実行してください", interrupt=True)
+                tr("リプレイバッファを起動しました。数十秒待ってから、"
+                   "もう一度リプレイ保存を実行してください",
+                   "Started the replay buffer. Wait a few tens of seconds, then save the replay again"), interrupt=True)
         except commands.ReplayBufferUnavailable:
             speech.warn(
-                "リプレイバッファが無効です。OBSの設定、出力、リプレイバッファ"
-                "で有効にしてください")
+                tr("リプレイバッファが無効です。OBSの設定、出力、リプレイバッファ"
+                   "で有効にしてください",
+                   "The replay buffer is disabled. Enable it in OBS Settings, Output, Replay Buffer"))
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"リプレイの保存に失敗しました（{exc}）")
+            speech.error(tr(f"リプレイの保存に失敗しました（{exc}）", f"Could not save the replay ({exc})"))
 
     def _settle_replay(self) -> None:
         """リプレイ保存の完了イベントが届かなかったときの保険。
@@ -2256,7 +2285,7 @@ class MainFrame(wx.Frame):
         """
         if not self._require_connection():
             return
-        speech.speak("カメラを確認します", interrupt=True)
+        speech.speak(tr("カメラを確認します", "Checking cameras"), interrupt=True)
         try:
             names = commands.fetch_camera_names(self.conn.req)
             scene = self.snapshot.current_scene
@@ -2264,7 +2293,7 @@ class MainFrame(wx.Frame):
                       for n in names]
             unused = commands.fetch_unused_camera_devices(self.conn.req, names)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"カメラの状態を取得できませんでした（{exc}）")
+            speech.error(tr(f"カメラの状態を取得できませんでした（{exc}）", f"Could not get the camera state ({exc})"))
             return
         speech.speak(
             speech_format.camera_list_speech(states, unused), interrupt=True)
@@ -2281,7 +2310,7 @@ class MainFrame(wx.Frame):
             return ""
         with self.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"切り替えるカメラ、{len(names)}件", "カメラ", names)
+                self, tr(f"切り替えるカメラ、{len(names)}件", f"{len(names)} cameras to switch"), tr("カメラ", "Camera"), names)
             try:
                 if dlg.ShowModal() != wx.ID_OK:
                     return ""
@@ -2310,19 +2339,19 @@ class MainFrame(wx.Frame):
         try:
             before = commands.fetch_camera_state(self.conn.req, name, scene)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"カメラの状態を取得できませんでした（{exc}）")
+            speech.error(tr(f"カメラの状態を取得できませんでした（{exc}）", f"Could not get the camera state ({exc})"))
             return
         expected = camera.next_state_after_toggle(before.active)
         if self.config.camera.get("confirm_before_toggle", False):
             if not self._ready_for_dialog():
                 return
-            action = "動かし" if expected else "止め"
-            if not self._confirm(f"{name} を{action}ますか？"):
+            action = tr("動かし", "Start") if expected else tr("止め", "Stop")
+            if not self._confirm(tr(f"{name} を{action}ますか？", f"{action} {name}?")):
                 return
         try:
             commands.toggle_camera_active(self.conn.req, name)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"カメラの切り替えに失敗しました（{exc}）")
+            speech.error(tr(f"カメラの切り替えに失敗しました（{exc}）", f"Could not switch the camera ({exc})"))
             return
         # 切り替えは1〜2秒かかる。その間黙っていると効いたか分からないので、
         # 何をするかだけ先に伝える。結果は確かめてから言う
@@ -2399,11 +2428,11 @@ class MainFrame(wx.Frame):
         if not self._require_connection():
             return
         # 数回の問い合わせが要るので、先に「今読んでいる」ことを伝える
-        speech.speak("録画設定を読み込みます", interrupt=True)
+        speech.speak(tr("録画設定を読み込みます", "Loading recording settings"), interrupt=True)
         try:
             settings = commands.fetch_record_settings(self.conn.req)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"録画設定を取得できませんでした（{exc}）")
+            speech.error(tr(f"録画設定を取得できませんでした（{exc}）", f"Could not get the recording settings ({exc})"))
             return
         speech.speak(
             speech_format.record_settings_summary(settings), interrupt=True)
@@ -2423,7 +2452,7 @@ class MainFrame(wx.Frame):
         try:
             commands.set_input_audio_track(self.conn.req, name, number, on)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"トラックを変えられませんでした（{exc}）")
+            speech.error(tr(f"トラックを変えられませんでした（{exc}）", f"Could not change the tracks ({exc})"))
             return None
         states = commands.fetch_input_audio_tracks(self.conn.req, name)
         if states is None or states[number - 1] != bool(on):
@@ -2433,8 +2462,9 @@ class MainFrame(wx.Frame):
             name, number, on, states)
         rec = commands.fetch_record_tracks(self.conn.req).get("tracks")
         if on and rec is not None and not rec[number - 1]:
-            text += (f"。トラック{number}は今は録画されていません。"
-                     "配信・録画メニューの録画のトラック設定で足せます")
+            text += (tr(f"。トラック{number}は今は録画されていません。"
+                        "配信・録画メニューの録画のトラック設定で足せます",
+               f". Track {number} is not recorded now. You can add it with Recording track settings in the Stream and Record menu"))
         speech.speak(text, interrupt=True)
         return states
 
@@ -2448,8 +2478,9 @@ class MainFrame(wx.Frame):
         if not self._require_connection():
             return None
         if self.snapshot.recording:
-            speech.warn("録画中は録画のトラックを変えられません。"
-                        "次の録画から効く設定なので、録画を止めてから変えてください")
+            speech.warn(tr("録画中は録画のトラックを変えられません。"
+                           "次の録画から効く設定なので、録画を止めてから変えてください",
+               "The recording tracks cannot be changed while recording. They take effect from the next recording, so stop recording first"))
             return None
         current = info.get("tracks")
         if current is None:
@@ -2460,17 +2491,18 @@ class MainFrame(wx.Frame):
         try:
             commands.apply_record_tracks(self.conn.req, section, wanted)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"録画のトラックを変えられませんでした（{exc}）")
+            speech.error(tr(f"録画のトラックを変えられませんでした（{exc}）", f"Could not change the recording tracks ({exc})"))
             return None
         got = commands.fetch_record_tracks(self.conn.req).get("tracks")
         if got is None or tuple(got) != tuple(wanted):
-            speech.warn("録画のトラックは変わりませんでした。"
-                        "OBSが受け付けていません")
+            speech.warn(tr("録画のトラックは変わりませんでした。"
+                           "OBSが受け付けていません",
+               "The recording tracks did not change. OBS did not accept it"))
             return got
         text = speech_format.record_tracks_changed_speech(got)
         note = tracks.simple_mode_note(section, info.get("quality", ""))
         if note:
-            text += "。" + note
+            text += tr("。", ". ") + note
         speech.speak(text, interrupt=True)
         return got
 
@@ -2482,7 +2514,7 @@ class MainFrame(wx.Frame):
         """
         if not self._require_connection():
             return
-        speech.speak("録画のトラック割り当てを読み込みます", interrupt=True)
+        speech.speak(tr("録画のトラック割り当てを読み込みます", "Loading the recording track assignment"), interrupt=True)
         try:
             info = commands.fetch_record_tracks(self.conn.req)
             per_input: dict = {}
@@ -2492,7 +2524,7 @@ class MainFrame(wx.Frame):
                 if states is not None:
                     per_input[inp.name] = states
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"トラックの割り当てを取得できませんでした（{exc}）")
+            speech.error(tr(f"トラックの割り当てを取得できませんでした（{exc}）", f"Could not get the track assignment ({exc})"))
             return
         note = tracks.simple_mode_note(
             info.get("section", ""), info.get("quality", ""))
@@ -2533,15 +2565,15 @@ class MainFrame(wx.Frame):
             path = commands.fetch_last_replay_path(self.conn.req)
         if path and os.path.isfile(path):
             speech.speak(
-                f"{props.file_stem(path)} の場所を開きます", interrupt=True)
+                tr(f"{props.file_stem(path)} の場所を開きます", f"Opening the location of {props.file_stem(path)}"), interrupt=True)
             self._reveal_in_explorer(path)
             return
         folder = commands.fetch_record_directory(self.conn.req)
         if not folder or not os.path.isdir(folder):
-            speech.warn("録画の保存先が分かりません")
+            speech.warn(tr("録画の保存先が分かりません", "The recording folder is unknown"))
             return
         speech.speak(
-            f"録画の保存先 {speech_format.path_speech(folder)} を開きます",
+            tr(f"録画の保存先 {speech_format.path_speech(folder)} を開きます", f"Opening the recording folder {speech_format.path_speech(folder)}"),
             interrupt=True)
         self._reveal_in_explorer(folder)
 
@@ -2560,7 +2592,7 @@ class MainFrame(wx.Frame):
             subprocess.Popen(
                 args, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"フォルダを開けませんでした（{exc}）")
+            speech.error(tr(f"フォルダを開けませんでした（{exc}）", f"Could not open the folder ({exc})"))
 
     # ------------------------------------------------------------
     # 設定変更の合流（読み上げを1回にまとめる）
@@ -2622,7 +2654,7 @@ class MainFrame(wx.Frame):
     def _speak_game_switch_result(self, op: SettingsOp) -> None:
         video = op.extra.get("video", "")
         if not op.applied(video, "window"):
-            speech.warn(speech_format.prop_unchanged_speech(video, "対象ウィンドウ"))
+            speech.warn(speech_format.prop_unchanged_speech(video, tr("対象ウィンドウ", "Window")))
             return
         speech.speak(
             speech_format.game_switch_speech(
@@ -2638,7 +2670,7 @@ class MainFrame(wx.Frame):
         want = op.expected.get(source, {})
         for key in want:
             if not op.applied(source, key):
-                label = op.extra.get("first_label", "設定")
+                label = op.extra.get("first_label", tr("設定", "setting"))
                 speech.warn(speech_format.prop_unchanged_speech(source, label))
                 return
         speech.speak(
@@ -2780,39 +2812,39 @@ class MainFrame(wx.Frame):
 
         if target is self.scene_list:
             has = self.scene_list.GetSelection() != wx.NOT_FOUND
-            add("シーンの設定", self.open_scene_props, has)
-            add("シーンを作る", self.create_scene)
-            add("シーンを削除", self.remove_scene, has)
+            add(tr("シーンの設定", "Scene settings"), self.open_scene_props, has)
+            add(tr("シーンを作る", "Create scene"), self.create_scene)
+            add(tr("シーンを削除", "Delete scene"), self.remove_scene, has)
             menu.AppendSeparator()
-            add("シーン一覧の並び順", self.open_scene_order)
+            add(tr("シーン一覧の並び順", "Scene list order"), self.open_scene_order)
         elif target is self.item_list:
             has = self.item_list.GetSelection() != wx.NOT_FOUND
-            add("ソースの設定", self.open_source_props, has)
-            add("フィルターを追加", self.add_filter, has)
+            add(tr("ソースの設定", "Source settings"), self.open_source_props, has)
+            add(tr("フィルターを追加", "Add filter"), self.add_filter, has)
             menu.AppendSeparator()
-            add("ソースを作る", self.create_source)
-            add("ソースを削除", self.remove_source, has)
+            add(tr("ソースを作る", "Create source"), self.create_source)
+            add(tr("ソースを削除", "Delete source"), self.remove_source, has)
             menu.AppendSeparator()
-            add("ソースを前に出す（重なり順）",
+            add(tr("ソースを前に出す（重なり順）", "Bring source forward (stacking order)"),
                 lambda: self.move_item_layer(True), has)
-            add("ソースを後ろに送る（重なり順）",
+            add(tr("ソースを後ろに送る（重なり順）", "Send source backward (stacking order)"),
                 lambda: self.move_item_layer(False), has)
-            add("ソース一覧の並び順", self.open_item_order)
+            add(tr("ソース一覧の並び順", "Source list order"), self.open_item_order)
         elif target is self.input_list:
             has = self.input_list.GetSelection() != wx.NOT_FOUND
-            add("ソースの設定", self.open_source_props, has)
-            add("フィルターを追加", self.add_filter, has)
+            add(tr("ソースの設定", "Source settings"), self.open_source_props, has)
+            add(tr("フィルターを追加", "Add filter"), self.add_filter, has)
             menu.AppendSeparator()
-            add("音量を数値で入力", self.prompt_selected_volume, has)
-            add("ソースを削除", self.remove_source, has)
+            add(tr("音量を数値で入力", "Enter volume as a number"), self.prompt_selected_volume, has)
+            add(tr("ソースを削除", "Delete source"), self.remove_source, has)
             menu.AppendSeparator()
-            add("レベル読み上げの順番", self.open_level_order)
-            add("録画のトラック割り当てを読む", self.announce_tracks_overview)
+            add(tr("レベル読み上げの順番", "Level readout order"), self.open_level_order)
+            add(tr("録画のトラック割り当てを読む", "Read recording track assignment"), self.announce_tracks_overview)
         else:
             has = self._selected_filter_name() != ""
-            add("フィルターの設定", self.open_filter_props, has)
-            add("フィルターを追加", self.add_filter)
-            add("フィルターを削除", self.remove_filter, has)
+            add(tr("フィルターの設定", "Filter settings"), self.open_filter_props, has)
+            add(tr("フィルターを追加", "Add filter"), self.add_filter)
+            add(tr("フィルターを削除", "Delete filter"), self.remove_filter, has)
         return menu
 
     def _remember_list_focus(self, evt) -> None:
@@ -2845,15 +2877,15 @@ class MainFrame(wx.Frame):
         name = self._props_target()
         if not name:
             speech.speak(
-                "ソース一覧か音声入力一覧でソースを選んでから実行してください",
+                tr("ソース一覧か音声入力一覧でソースを選んでから実行してください", "Select a source in the source list or the audio input list first"),
                 interrupt=True)
             return
         kind = commands.fetch_input_kind(self.conn.req, name)
         if not kind:
             speech.warn(
-                f"{name} はシーンかグループのようです。設定はありません")
+                tr(f"{name} はシーンかグループのようです。設定はありません", f"{name} seems to be a scene or group. It has no settings"))
             return
-        speech.speak(f"{name} の設定を開きます", interrupt=True)
+        speech.speak(tr(f"{name} の設定を開きます", f"Opening the settings of {name}"), interrupt=True)
         with self.modal():
             dlg = prop_dialog.SourcePropDialog(self, name, kind)
             try:
@@ -2883,10 +2915,10 @@ class MainFrame(wx.Frame):
         if not self._ready_for_dialog():
             return
         existing = commands.fetch_scene_names(self.conn.req)
-        suggested = scenes.free_scene_name("新しいシーン", existing)
+        suggested = scenes.free_scene_name(tr("新しいシーン", "New scene"), existing)
         with self.modal():
             dlg = wx.TextEntryDialog(
-                self, "シーンの名前を入力してください。", "シーンを作る",
+                self, tr("シーンの名前を入力してください。", "Enter the name of the scene."), tr("シーンを作る", "Create scene"),
                 value=suggested)
             try:
                 if dlg.ShowModal() != wx.ID_OK:
@@ -2896,20 +2928,20 @@ class MainFrame(wx.Frame):
                 dlg.Destroy()
         name = scenes.valid_scene_name(typed)
         if not name:
-            speech.error("名前が空です。作成をやめました")
+            speech.error(tr("名前が空です。作成をやめました", "The name is empty. Creation canceled"))
             return
         if name in existing:
             # 黙って別名にせず、変えたことを伝える
             name = scenes.free_scene_name(name, existing)
-            speech.speak(f"同じ名前があるので {name} にします", interrupt=True)
+            speech.speak(tr(f"同じ名前があるので {name} にします", f"That name already exists, so it will be {name}"), interrupt=True)
         try:
             commands.create_scene(self.conn.req, name)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"シーンの作成に失敗しました（{exc}）")
+            speech.error(tr(f"シーンの作成に失敗しました（{exc}）", f"Could not create the scene ({exc})"))
             return
         self.refresh_from_obs()
         if name not in commands.fetch_scene_names(self.conn.req):
-            speech.warn("シーンを作れませんでした")
+            speech.warn(tr("シーンを作れませんでした", "Could not create the scene"))
             return
         # 作ったシーンを選んでおく（続けて中身を作れるように）
         if name in self.snapshot.scenes:
@@ -2925,10 +2957,10 @@ class MainFrame(wx.Frame):
         name = self._selected_scene()
         if not name:
             speech.speak(
-                "シーン一覧でシーンを選んでから実行してください",
+                tr("シーン一覧でシーンを選んでから実行してください", "Select a scene in the scene list first"),
                 interrupt=True)
             return
-        speech.speak(f"{name} の設定を開きます", interrupt=True)
+        speech.speak(tr(f"{name} の設定を開きます", f"Opening the settings of {name}"), interrupt=True)
         self._open_scene_props(name)
 
     def _open_scene_props(self, name: str) -> None:
@@ -2956,7 +2988,7 @@ class MainFrame(wx.Frame):
         name = self._selected_scene()
         if not name:
             speech.speak(
-                "シーン一覧でシーンを選んでから実行してください",
+                tr("シーン一覧でシーンを選んでから実行してください", "Select a scene in the scene list first"),
                 interrupt=True)
             return
         # ★最後の1つは消せない。OBSのエラーを読み上げても何が悪いか
@@ -2976,7 +3008,7 @@ class MainFrame(wx.Frame):
         try:
             commands.remove_scene(self.conn.req, name)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"シーンの削除に失敗しました（{exc}）")
+            speech.error(tr(f"シーンの削除に失敗しました（{exc}）", f"Could not delete the scene ({exc})"))
             return
         self.refresh_from_obs()
         speech.speak(
@@ -3010,7 +3042,7 @@ class MainFrame(wx.Frame):
             return
         scene = self._target_scene()
         if not scene:
-            speech.error("シーンが取得できないため作成できません")
+            speech.error(tr("シーンが取得できないため作成できません", "Cannot create it because the scene is unknown"))
             return
         if not self._ready_for_dialog():
             return
@@ -3019,8 +3051,8 @@ class MainFrame(wx.Frame):
         rows = [speech_format.source_kind_row(k) for k in kinds]
         with self.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"{scene} に作るソースの種類、{len(rows)}件",
-                "ソースを作る", rows)
+                self, tr(f"{scene} に作るソースの種類、{len(rows)}件", f"{len(rows)} kinds of sources to create in {scene}"),
+                tr("ソースを作る", "Create source"), rows)
             try:
                 # ★キャンセルでも GetSelection は値を返すので必ず判定する
                 if dlg.ShowModal() != wx.ID_OK:
@@ -3040,9 +3072,10 @@ class MainFrame(wx.Frame):
         with self.modal():
             dlg = wx.TextEntryDialog(
                 self,
-                f"{info.label} の名前を入力してください。\n"
-                f"シーン {scene} に作ります。",
-                "ソースの名前", value=suggested)
+                tr(f"{info.label} の名前を入力してください。\n"
+                   f"シーン {scene} に作ります。",
+                   f"Enter the name of the {info.label}.\nIt will be created in scene {scene}."),
+                tr("ソースの名前", "Source name"), value=suggested)
             try:
                 if dlg.ShowModal() != wx.ID_OK:
                     return
@@ -3051,24 +3084,25 @@ class MainFrame(wx.Frame):
                 dlg.Destroy()
         name = sources.valid_source_name(typed)
         if not name:
-            speech.error("名前が空です。作成をやめました")
+            speech.error(tr("名前が空です。作成をやめました", "The name is empty. Creation canceled"))
             return
         if name in existing:
             # 同名は OBS が拒否する。黙って別名にせず、何をしたか伝える
             name = sources.free_source_name(name, existing)
-            speech.speak(f"同じ名前があるので {name} にします", interrupt=True)
+            speech.speak(tr(f"同じ名前があるので {name} にします", f"That name already exists, so it will be {name}"), interrupt=True)
 
         try:
             commands.create_source(self.conn.req, scene, name, info.kind)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"ソースの作成に失敗しました（{exc}）")
+            speech.error(tr(f"ソースの作成に失敗しました（{exc}）", f"Could not create the source ({exc})"))
             return
         self.refresh_from_obs()
         # 本当にできたかを確かめてから言う
         if not commands.fetch_input_kind(self.conn.req, name):
             speech.warn(
-                f"{info.label} を作れませんでした。"
-                "OBSがこの種類のソースを受け付けていません")
+                tr(f"{info.label} を作れませんでした。"
+                   "OBSがこの種類のソースを受け付けていません",
+                   f"Could not create {info.label}. OBS did not accept this type of source"))
             return
         speech.speak(
             speech_format.source_created_speech(name, info, scene),
@@ -3102,13 +3136,13 @@ class MainFrame(wx.Frame):
         name = self._props_target()
         if not name:
             speech.speak(
-                "ソース一覧か音声入力一覧でソースを選んでから実行してください",
+                tr("ソース一覧か音声入力一覧でソースを選んでから実行してください", "Select a source in the source list or the audio input list first"),
                 interrupt=True)
             return
         kind = commands.fetch_input_kind(self.conn.req, name)
         if not kind:
             speech.warn(
-                f"{name} はシーンかグループのようです。ここでは削除できません")
+                tr(f"{name} はシーンかグループのようです。ここでは削除できません", f"{name} seems to be a scene or group. It cannot be deleted here"))
             return
         if not self._ready_for_dialog():
             return
@@ -3119,7 +3153,7 @@ class MainFrame(wx.Frame):
         try:
             commands.remove_source(self.conn.req, name)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"ソースの削除に失敗しました（{exc}）")
+            speech.error(tr(f"ソースの削除に失敗しました（{exc}）", f"Could not delete the source ({exc})"))
             return
         self.refresh_from_obs()
         speech.speak(
@@ -3133,12 +3167,12 @@ class MainFrame(wx.Frame):
         """
         roles: list[str] = []
         if name in self._sr_by_name:
-            roles.append("スクリーンリーダー音声")
+            roles.append(tr("スクリーンリーダー音声", "screen reader voice"))
         cfg = self.config.game_switch
         if name == cfg.get("video_source"):
-            roles.append("ゲーム切り替えの映像")
+            roles.append(tr("ゲーム切り替えの映像", "game switch video"))
         if name in (cfg.get("audio_sources") or []):
-            roles.append("ゲーム切り替えの音声")
+            roles.append(tr("ゲーム切り替えの音声", "game switch audio"))
         if name == self.config.bgm.get("source_name"):
             roles.append("BGM")
         return roles
@@ -3150,9 +3184,9 @@ class MainFrame(wx.Frame):
         try:
             commands.apply_input_settings(self.conn.req, source, patch)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"設定の変更に失敗しました（{exc}）")
+            speech.error(tr(f"設定の変更に失敗しました（{exc}）", f"Could not change the settings ({exc})"))
             return False
-        first_label = labels[0][0] if labels else "設定"
+        first_label = labels[0][0] if labels else tr("設定", "setting")
         self._start_settings_op(
             "prop", [source], {source: dict(patch)},
             {"source": source, "labels": list(labels),
@@ -3166,7 +3200,7 @@ class MainFrame(wx.Frame):
         try:
             commands.set_monitor_type(self.conn.req, source, mon_type)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"モニタリングの変更に失敗しました（{exc}）")
+            speech.error(tr(f"モニタリングの変更に失敗しました（{exc}）", f"Could not change monitoring ({exc})"))
             return False
         return True
 
@@ -3178,7 +3212,7 @@ class MainFrame(wx.Frame):
         """
         # ネイティブのファイル選択は表示までに数秒かかることがあり、その間
         # 無音になる。モーダル中は CallLater が動かないので案内は必ず前に。
-        speech.speak("ファイルを選ぶ画面を開きます", interrupt=True)
+        speech.speak(tr("ファイルを選ぶ画面を開きます", "Opening the file chooser"), interrupt=True)
         key = "last_dir" if file_kind == "audio" else f"last_dir_{file_kind}"
         with self.modal():
             path = prop_dialog.pick_audio_file(
@@ -3205,13 +3239,13 @@ class MainFrame(wx.Frame):
             return current
         names = commands.fetch_input_names_by_kind(self.conn.req, want_kind)
         if not names:
-            speech.error(f"{title}に使えるソースがOBSにありません")
+            speech.error(tr(f"{title}に使えるソースがOBSにありません", f"There is no source in OBS for {title}"))
             return ""
         if len(names) == 1:
             return names[0]
         with self.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"{title}を選んでください、{len(names)}件", title, names)
+                self, tr(f"{title}を選んでください、{len(names)}件", f"Choose: {title}, {len(names)} items"), title, names)
             try:
                 if dlg.ShowModal() != wx.ID_OK:
                     return ""
@@ -3242,8 +3276,9 @@ class MainFrame(wx.Frame):
             return
         if not self.IsActive():
             speech.warn(
-                "OBSナビを前に出せませんでした。"
-                "Alt+Tab でOBSナビに切り替えてから F3 を押してください")
+                tr("OBSナビを前に出せませんでした。"
+                   "Alt+Tab でOBSナビに切り替えてから F3 を押してください",
+                   "Could not bring OBS Navi to the front. Switch to OBS Navi with Alt+Tab, then press F3"))
             return
         self.open_game_switch()
 
@@ -3254,14 +3289,14 @@ class MainFrame(wx.Frame):
         cfg = self.config.game_switch
         video = self._resolve_source(
             cfg.get("video_source", ""), props.GAME_CAPTURE_KIND,
-            "ゲーム映像のソース")
+            tr("ゲーム映像のソース", "Game video source"))
         if not video:
             return
         if video != cfg.get("video_source"):
             cfg["video_source"] = video
             self._save_config()
 
-        speech.speak("ゲーム一覧を読み込みます", interrupt=True)
+        speech.speak(tr("ゲーム一覧を読み込みます", "Loading the list of games"), interrupt=True)
         items = commands.fetch_property_items(self.conn.req, video, "window")
         # ゲームキャプチャ側の一覧を使うのが肝。アプリ音声キャプチャの
         # 一覧はブラウザやツールも全部出るので、選ぶには向かない。
@@ -3269,8 +3304,9 @@ class MainFrame(wx.Frame):
         items = [it for it in items if it.get("itemValue")]
         if not items:
             speech.warn(
-                "ゲームの候補がありません。"
-                "ゲームを起動してから、もう一度 F3 を押してください")
+                tr("ゲームの候補がありません。"
+                   "ゲームを起動してから、もう一度 F3 を押してください",
+                   "There are no games to choose from. Start the game, then press F3 again"))
             return
         rows = [speech_format.window_item_label(
             it.get("itemName", ""), it.get("itemEnabled", True))
@@ -3287,8 +3323,8 @@ class MainFrame(wx.Frame):
         sel = props.first_running_index(items, str(current))
         with self.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"切り替え先のゲーム、{len(rows)}件",
-                "ゲーム切り替え", rows)
+                self, tr(f"切り替え先のゲーム、{len(rows)}件", f"{len(rows)} games to switch to"),
+                tr("ゲーム切り替え", "Game switch"), rows)
             try:
                 if 0 <= sel < len(rows):
                     dlg.SetSelection(sel)
@@ -3319,7 +3355,7 @@ class MainFrame(wx.Frame):
         try:
             commands.apply_input_settings(self.conn.req, video, patch)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"ゲームの切り替えに失敗しました（{exc}）")
+            speech.error(tr(f"ゲームの切り替えに失敗しました（{exc}）", f"Could not switch the game ({exc})"))
             return
 
         sources = [video]
@@ -3376,15 +3412,16 @@ class MainFrame(wx.Frame):
         #   ではない。見えていないシーンを触る余地を作らない。
         scene = self.snapshot.current_scene
         if not scene:
-            speech.error("現在のシーンが取得できません")
+            speech.error(tr("現在のシーンが取得できません", "Could not get the current scene"))
             return
         ok, items = commands.fetch_scene_items_checked(self.conn.req, scene)
         if not ok:
             # ★「映像ソースがありません。作ってから実行してください」と
             #   案内してしまうと、あるのに作らせることになる
             speech.error(
-                "ソースの一覧を取得できませんでした。"
-                "OBSとの接続を確かめてください")
+                tr("ソースの一覧を取得できませんでした。"
+                   "OBSとの接続を確かめてください",
+                   "Could not get the list of sources. Check the connection to OBS"))
             return
         extra = self.config.video_switch.get("extra_kinds", [])
         targets = video.video_items(items, extra)
@@ -3393,7 +3430,7 @@ class MainFrame(wx.Frame):
             return
         if len(targets) == 1:
             speech.speak(
-                f"映像ソースは {targets[0].name} だけです。切り替えるものがありません",
+                tr(f"映像ソースは {targets[0].name} だけです。切り替えるものがありません", f"{targets[0].name} is the only video source. There is nothing to switch"),
                 interrupt=True)
             return
         top = video.front_index(items, extra)
@@ -3405,7 +3442,7 @@ class MainFrame(wx.Frame):
         sel = video.first_other_index(items, extra)
         with self.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"前に出す映像、{len(rows)}件", "映像切り替え", rows)
+                self, tr(f"前に出す映像、{len(rows)}件", f"{len(rows)} videos to bring to the front"), tr("映像切り替え", "Video switch"), rows)
             try:
                 if 0 <= sel < len(rows):
                     dlg.SetSelection(sel)
@@ -3424,7 +3461,7 @@ class MainFrame(wx.Frame):
         extra = self.config.video_switch.get("extra_kinds", [])
         plan = video.plan_bring_to_front(items, item_id, extra)
         if plan is None:
-            speech.error("対象の映像ソースが見つかりません")
+            speech.error(tr("対象の映像ソースが見つかりません", "The target video source was not found"))
             return
         if plan.already_front:
             speech.speak(
@@ -3435,7 +3472,7 @@ class MainFrame(wx.Frame):
             commands.set_scene_item_index(
                 self.conn.req, scene, plan.item_id, plan.dest_index)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"映像の切り替えに失敗しました（{exc}）")
+            speech.error(tr(f"映像の切り替えに失敗しました（{exc}）", f"Could not switch the video ({exc})"))
             return
         # 反映を読み直してから1回だけ喋る（重なり順のイベントは種類が
         # 多く、素直に喋ると複数回になるため。確認も兼ねる）
@@ -3478,7 +3515,7 @@ class MainFrame(wx.Frame):
         except Exception as exc:  # noqa: BLE001
             # 種別を確かめた直後にソースが消される、通信が切れる等。
             # 無言で終わらせない（読み上げが唯一の手がかりなので）
-            speech.error(f"BGMの設定を取得できませんでした（{exc}）")
+            speech.error(tr(f"BGMの設定を取得できませんでした（{exc}）", f"Could not get the BGM settings ({exc})"))
             return
         path = str(merged.get("local_file", "") or "")
         if not path or not os.path.isfile(path):
@@ -3486,20 +3523,20 @@ class MainFrame(wx.Frame):
             # 呼ばれてウィンドウが後ろにいると見えないダイアログになる。
             if not self._ready_for_dialog():
                 return
-            speech.warn("音楽ファイルが見つかりません。選び直してください")
+            speech.warn(tr("音楽ファイルが見つかりません。選び直してください", "The music file was not found. Choose it again"))
             new_path = self.pick_audio_file()
             if not new_path:
                 return
             self.apply_props_change(
                 name, {"local_file": new_path, "is_local_file": True},
-                [("音楽ファイル", props.file_stem(new_path))])
+                [(tr("音楽ファイル", "Music file"), props.file_stem(new_path))])
             return
         state, _cur, _dur = commands.fetch_media_status(self.conn.req, name)
         action = props.media_action_for_state(state)
         try:
             commands.trigger_media_action(self.conn.req, name, action)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"BGMの操作に失敗しました（{exc}）")
+            speech.error(tr(f"BGMの操作に失敗しました（{exc}）", f"BGM operation failed ({exc})"))
         # 読み上げはメディアイベント側で行う（一方通行の原則）
 
     def _resolve_bgm_source(self) -> str:
@@ -3509,7 +3546,7 @@ class MainFrame(wx.Frame):
         それを使う（利用者がOBS側で用意した名前に合わせられるように）。
         決まったら設定に覚える。
         """
-        name = self.config.bgm.get("source_name", "BGM音楽")
+        name = self.config.bgm.get("source_name", tr("BGM音楽", "BGM Music"))
         kind = commands.fetch_input_kind(self.conn.req, name)
         if props.is_media_kind(kind):
             return name
@@ -3532,8 +3569,8 @@ class MainFrame(wx.Frame):
                 return ""
             with self.modal():
                 dlg = wx.SingleChoiceDialog(
-                    self, f"BGMに使うメディアソースを選んでください、{len(names)}件",
-                    "BGMのソース", names)
+                    self, tr(f"BGMに使うメディアソースを選んでください、{len(names)}件", f"Choose the media source to use for BGM, {len(names)} items"),
+                    tr("BGMのソース", "BGM source"), names)
                 try:
                     if dlg.ShowModal() != wx.ID_OK:
                         return ""
@@ -3545,7 +3582,7 @@ class MainFrame(wx.Frame):
             chosen = names[idx]
         self.config.bgm["source_name"] = chosen
         self._save_config()
-        speech.speak(f"BGMに {chosen} を使います", interrupt=True)
+        speech.speak(tr(f"BGMに {chosen} を使います", f"Using {chosen} for BGM"), interrupt=True)
         return chosen
 
     def _free_input_name(self, base: str) -> str:
@@ -3562,11 +3599,12 @@ class MainFrame(wx.Frame):
         """BGM用のメディアソースを作る（既存のBGMには触らない）。"""
         scene = self.snapshot.current_scene
         if not scene:
-            speech.error("現在のシーンが取得できないため作成できません")
+            speech.error(tr("現在のシーンが取得できないため作成できません", "Cannot create it because the current scene is unknown"))
             return
         if not self._confirm(
-            f"音楽ファイルを再生する入力「{name}」がありません。"
-            f"シーン「{scene}」に作成しますか？"
+            tr(f"音楽ファイルを再生する入力「{name}」がありません。"
+               f"シーン「{scene}」に作成しますか？",
+               f"There is no input \"{name}\" for playing music files. Create it in scene \"{scene}\"?")
         ):
             return
         path = self.pick_audio_file()
@@ -3576,7 +3614,7 @@ class MainFrame(wx.Frame):
         try:
             commands.create_media_input(self.conn.req, scene, name, path)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"BGMの作成に失敗しました（{exc}）")
+            speech.error(tr(f"BGMの作成に失敗しました（{exc}）", f"Could not create the BGM ({exc})"))
             return
         # 別名で作った場合も、次回からその名前を使えるよう設定に覚える
         if self.config.bgm.get("source_name") != name:
@@ -3587,15 +3625,16 @@ class MainFrame(wx.Frame):
         #   教えることになる
         window_key = keymap.window_key_label(self.config, "bgm")
         global_key = keymap.global_key_label(self.config, "bgm")
-        how = "ソースメニューの「BGMの再生・一時停止」で操作できます"
+        how = tr("ソースメニューの「BGMの再生・一時停止」で操作できます", "Use Play or pause BGM in the Sources menu")
         if window_key and global_key:
-            how = (f"{window_key}（どこにいても {global_key}）"
-                   "で再生と一時停止ができます")
+            how = (tr(f"{window_key}（どこにいても {global_key}）"
+                      "で再生と一時停止ができます",
+               f"Press {window_key} (or {global_key} from anywhere) to play and pause"))
         elif window_key or global_key:
-            how = f"{window_key or global_key} で再生と一時停止ができます"
+            how = tr(f"{window_key or global_key} で再生と一時停止ができます", f"Press {window_key or global_key} to play and pause")
         speech.speak(
             speech_format.bgm_file_speech(name, path)
-            + f"。{scene} で鳴ります。{how}",
+            + tr(f"。{scene} で鳴ります。{how}", f". It plays in {scene}. {how}"),
             interrupt=True)
 
     # ------------------------------------------------------------
@@ -3723,6 +3762,84 @@ class MainFrame(wx.Frame):
     def on_exit_menu(self, _evt: wx.CommandEvent) -> None:
         self.Close()
 
+    def on_language(self, _evt: wx.CommandEvent) -> None:
+        """表示と読み上げの言語を選ぶ（自動・日本語・English）。
+
+        ★言語は起動したときに1回だけ決まる（core/i18n.py）。メニューや
+        一覧の文言は作ったときの言語のままなので、その場では切り替えず、
+        設定に保存して再起動を勧める。
+        """
+        if not self._ready_for_dialog():
+            return
+        settings = list(i18n.SETTINGS)
+        system = ("日本語" if i18n.system_language() == "ja"
+                  else "English")
+        # ★選択肢は言語に関係なく同じ文言（どちらの言葉でも読める形）
+        rows = [f"自動 PC の言語に合わせる (Automatic, {system})",
+                "日本語 (Japanese)",
+                "English (英語)"]
+        current = i18n.normalize_setting(self.config.language)
+        with self.modal():
+            dlg = wx.SingleChoiceDialog(
+                self, "表示と読み上げの言語 (Display language)",
+                "表示の言語 (Language)", rows)
+            dlg.SetSelection(settings.index(current))
+            try:
+                if dlg.ShowModal() != wx.ID_OK:
+                    return
+                idx = dlg.GetSelection()
+            finally:
+                dlg.Destroy()
+        if not 0 <= idx < len(settings):
+            return
+        chosen = settings[idx]
+        if chosen == current:
+            speech.speak(tr("変更はありません", "No changes"), interrupt=True)
+            return
+        self.config.language = chosen
+        if not self._save_config():
+            speech.error(speech_format.config_save_failed_speech(
+                tr("表示の言語", "the display language")))
+            return
+        after = i18n.resolve(chosen)
+        if after == i18n.language():
+            # 自動にしたが、PC の言語が今と同じだった＝見た目は変わらない
+            speech.speak(tr("表示の言語を保存しました",
+                            "Saved the display language"), interrupt=True)
+            return
+        # ★次の言語で尋ねる。選んだ言語で読めることを、その場で確かめられる
+        message = ("Saved. Restart OBS Navi now to switch to English?"
+                   if after == "en" else
+                   "保存しました。日本語にするため、今すぐ OBSナビを"
+                   "再起動しますか？")
+        if self._confirm(message):
+            self._restart_after_close = True
+            self.Close()
+        else:
+            speech.speak(
+                "It will be English the next time you start OBS Navi"
+                if after == "en" else
+                "次に OBSナビを起動したときから日本語になります",
+                interrupt=True)
+
+    def _spawn_new_instance(self) -> None:
+        """自分をもう1つ起動する（言語を変えたあとの再起動用）。
+
+        ★on_close でグローバルキーを外したあとに呼ぶ。先に新しい方を
+        起動すると、同じキーを登録できずに警告が出る。
+        """
+        if getattr(sys, "frozen", False):
+            args = [sys.executable]
+        else:
+            app = os.path.join(os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__))), "app.py")
+            args = [sys.executable, "-X", "utf8", app]
+        try:
+            subprocess.Popen(args, close_fds=True)
+        except OSError as exc:
+            speech.error(tr(f"再起動できませんでした（{exc}）",
+                            f"Could not restart ({exc})"))
+
     def on_help_keys(self, _evt: wx.CommandEvent) -> None:
         """キー操作の一覧を出す。
 
@@ -3740,19 +3857,19 @@ class MainFrame(wx.Frame):
 
     def on_about(self, _evt: wx.CommandEvent) -> None:
         """バージョンと接続先、ライセンスの告知を読む。"""
-        parts = [f"OBSナビ バージョン {VERSION}"]
+        parts = [tr(f"OBSナビ バージョン {VERSION}", f"OBS Navi version {VERSION}")]
         if self.conn.connected and self.snapshot.obs_version:
-            parts.append(f"OBS {self.snapshot.obs_version} に接続中")
+            parts.append(tr(f"OBS {self.snapshot.obs_version} に接続中", f"Connected to OBS {self.snapshot.obs_version}"))
         elif self.conn.connected:
-            parts.append("OBSに接続中")
+            parts.append(tr("OBSに接続中", "Connected to OBS"))
         else:
-            parts.append("OBSに接続していません")
-        parts.append("キー操作は、ヘルプメニューのキー操作の一覧で読めます")
+            parts.append(tr("OBSに接続していません", "Not connected to OBS"))
+        parts.append(tr("キー操作は、ヘルプメニューのキー操作の一覧で読めます", "You can read the keys with Key list in the Help menu"))
         # AI を使って作ったことの告知（README・マニュアルと同じ趣旨）
         parts.append(speech_format.ai_notice_speech())
         # ★GPL-3.0 の告知（0.18.4）。理由は license_notice_speech の説明
         parts.append(speech_format.license_notice_speech())
-        speech.speak("。".join(parts), interrupt=True)
+        speech.speak(tr("。", ". ").join(parts), interrupt=True)
 
     # ------------------------------------------------------------
     # キー処理（パネルの EVT_CHAR_HOOK に集約）
@@ -3774,7 +3891,7 @@ class MainFrame(wx.Frame):
             handler = actions.get(action_id)
             if handler is None:
                 self._key_problems.append(
-                    f"{desc}のキーは定義されていますが動作が実装されていません")
+                    tr(f"{desc}のキーは定義されていますが動作が実装されていません", f"The key for {desc} is defined but the action is not implemented"))
                 continue
             mods = wx.MOD_NONE
             if ctrl:
@@ -3874,7 +3991,7 @@ class MainFrame(wx.Frame):
             elif focus is self.output_list:
                 # ★この一覧は、それ自体が操作の一覧。黙っていると壊れたと
                 #   思われるので、使い方を言う（0.18.3、レビューで判明）
-                speech.speak("この一覧は、上下矢印で選んでEnterで実行します",
+                speech.speak(tr("この一覧は、上下矢印で選んでEnterで実行します", "In this list, choose with Up and Down Arrow and press Enter to run"),
                              interrupt=True)
             else:
                 evt.Skip()
@@ -3955,6 +4072,8 @@ class MainFrame(wx.Frame):
         self._stop_record_watch()
         self.unregister_global_hotkeys()
         self.conn.close()
+        if self._restart_after_close:
+            self._spawn_new_instance()
         self.Destroy()
 
     # ------------------------------------------------------------
@@ -3987,7 +4106,7 @@ class MainFrame(wx.Frame):
         self.snapshot.record_paused = paused
         self.pause_reminder.set_paused(paused, time.monotonic())
         speech.speak(
-            "録画を一時停止しました" if paused else "録画を再開しました",
+            tr("録画を一時停止しました", "Paused recording") if paused else tr("録画を再開しました", "Resumed recording"),
             interrupt=True)
         self._set_status(speech_format.state_summary(self.snapshot))
 
@@ -4111,7 +4230,7 @@ class MainFrame(wx.Frame):
         if state in (STARTED, STOPPED):
             wx.CallAfter(
                 lambda: speech.speak(
-                    speech_format.onoff_speech("仮想カメラ", active),
+                    speech_format.onoff_speech(tr("仮想カメラ", "virtual camera"), active),
                     interrupt=True))
 
     def on_replay_buffer_saved(self, data) -> None:
@@ -4183,7 +4302,7 @@ class MainFrame(wx.Frame):
     def on_exit_started(self, _data) -> None:
         wx.CallAfter(
             self._handle_disconnect,
-            "OBSが終了しました。OBSを起動してから再接続してください")
+            tr("OBSが終了しました。OBSを起動してから再接続してください", "OBS has exited. Start OBS, then reconnect"))
 
     # ------------------------------------------------------------
     # UIスレッドでの状態適用
@@ -4194,9 +4313,9 @@ class MainFrame(wx.Frame):
         if kind == "stream":
             self.snapshot.streaming = active
             if state == STARTED:
-                speech.speak("配信を開始しました", interrupt=True)
+                speech.speak(tr("配信を開始しました", "Started streaming"), interrupt=True)
             elif state == STOPPED:
-                speech.speak("配信を停止しました", interrupt=True)
+                speech.speak(tr("配信を停止しました", "Stopped streaming"), interrupt=True)
         else:
             self.snapshot.recording = active
             if state == STARTED:
@@ -4207,7 +4326,7 @@ class MainFrame(wx.Frame):
                 self._last_record_path = ""
                 self.pause_reminder.reset()
                 self.disk_watch.reset()
-                speech.speak("録画を開始しました", interrupt=True)
+                speech.speak(tr("録画を開始しました", "Started recording"), interrupt=True)
             elif state == STOPPED:
                 self.snapshot.record_paused = False
                 self.pause_reminder.reset()
@@ -4233,7 +4352,7 @@ class MainFrame(wx.Frame):
         # 自分で追従させる（OBS本体側でシーンを切り替えたときに、シーン
         # 一覧のハイライトとソース一覧の中身が食い違ったままになるのを防ぐ）
         self.refresh_item_list()
-        speech.speak(f"シーン {name}", interrupt=True)
+        speech.speak(tr(f"シーン {name}", f"Scene {name}"), interrupt=True)
         self._set_status(speech_format.state_summary(self.snapshot))
 
     def _apply_scene_rename(self, old: str, new: str) -> None:
@@ -4394,15 +4513,15 @@ class MainFrame(wx.Frame):
             self._sr_setup_pending.discard(name)
             return
         caveat = self._mute_caveat(name, muted)
-        tail = f"。{caveat}" if caveat else ""
+        tail = tr(f"。{caveat}", f". {caveat}") if caveat else ""
         if name in self._sr_by_name:
             if muted:
-                speech.speak(f"{name}を配信から外しました{tail}", interrupt=True)
+                speech.speak(tr(f"{name}を配信から外しました{tail}", f"Removed {name} from the stream{tail}"), interrupt=True)
             else:
-                speech.speak(f"{name}を配信に乗せます{tail}", interrupt=True)
+                speech.speak(tr(f"{name}を配信に乗せます{tail}", f"Sending {name} to the stream{tail}"), interrupt=True)
         else:
             if muted:
-                speech.speak(f"{name}をミュートしました{tail}", interrupt=True)
+                speech.speak(tr(f"{name}をミュートしました{tail}", f"Muted {name}{tail}"), interrupt=True)
             else:
-                speech.speak(f"{name}のミュートを解除しました{tail}",
+                speech.speak(tr(f"{name}のミュートを解除しました{tail}", f"Unmuted {name}{tail}"),
                              interrupt=True)

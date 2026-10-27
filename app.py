@@ -18,12 +18,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import wx  # noqa: E402
 
 from core.config import Config  # noqa: E402
-from ui.main_frame import MainFrame  # noqa: E402
 
 
 def main() -> int:
     app = wx.App()
+    # ★設定を読んでから画面の部品を import する。設定の読み込みで
+    #   表示の言語が決まり（core/i18n.py）、メニューやキー一覧の表は
+    #   import のときにその言語で作られるため
     config = Config.load()
+    from ui.main_frame import MainFrame
     frame = MainFrame(config)
     frame.Show()
     app.MainLoop()

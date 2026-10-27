@@ -30,6 +30,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .i18n import tr
+
 # 映像キャプチャデバイスの種別。OBSの「映像キャプチャデバイス」。
 CAMERA_KIND = "dshow_input"
 
@@ -83,7 +85,7 @@ def device_label(item_name: str) -> str:
     余計な整形はしない。空なら「未設定」。
     """
     text = " ".join(str(item_name or "").split())
-    return text or "未設定"
+    return text or tr("未設定", "not set")
 
 
 def build_state(

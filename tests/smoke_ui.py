@@ -16,6 +16,7 @@ import os
 import sys
 
 os.environ["OBSNAVI_SILENT"] = "1"
+os.environ["OBSNAVI_LANG"] = "ja"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import wx  # noqa: E402

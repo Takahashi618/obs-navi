@@ -29,14 +29,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from . import hotkeys
+from .i18n import tr
 
 SCOPE_WINDOW = "window"
 SCOPE_GLOBAL = "global"
 
 # ヘルプの見出しもここから作る（文言の出どころを1つにする）
 SCOPE_LABEL = {
-    SCOPE_WINDOW: "OBSナビの画面にいるとき",
-    SCOPE_GLOBAL: "どこにいても効くキー",
+    SCOPE_WINDOW: tr("OBSナビの画面にいるとき", "While in the OBS Navi window"),
+    SCOPE_GLOBAL: tr("どこにいても効くキー", "Keys that work anywhere"),
 }
 
 # 設定で指定できるキー名。RegisterHotKey に渡せる（＝ui側の
@@ -79,18 +80,18 @@ class KeyRow:
 #   始めるつもりで止めてしまうため（読み上げで状態を確かめてから押す、
 #   をキーの形で強制しない）。配信は開始・停止とも確認ダイアログが出る。
 WINDOW_PLAN = (
-    ("stream_start", "Ctrl+S", "配信を開始"),
-    ("stream_stop", "Ctrl+Shift+S", "配信を停止"),
-    ("record_start", "Ctrl+R", "録画を開始"),
-    ("record_stop", "Ctrl+Shift+R", "録画を停止"),
-    ("state", "F5", "状態読み上げ"),
-    ("levels", "F6", "レベル読み上げ"),
-    ("volume_prompt", "F7", "音量を数値で入力"),
-    ("game", "F3", "ゲーム切り替え"),
-    ("bgm", "Ctrl+B", "BGMの再生・一時停止"),
-    ("video", "Ctrl+E", "映像切り替え"),
-    ("record_pause", "Ctrl+P", "録画の一時停止・再開"),
-    ("help", "F1", "キー操作の一覧"),
+    ("stream_start", "Ctrl+S", tr("配信を開始", "Start streaming")),
+    ("stream_stop", "Ctrl+Shift+S", tr("配信を停止", "Stop streaming")),
+    ("record_start", "Ctrl+R", tr("録画を開始", "Start recording")),
+    ("record_stop", "Ctrl+Shift+R", tr("録画を停止", "Stop recording")),
+    ("state", "F5", tr("状態読み上げ", "Read status")),
+    ("levels", "F6", tr("レベル読み上げ", "Read levels")),
+    ("volume_prompt", "F7", tr("音量を数値で入力", "Enter volume as a number")),
+    ("game", "F3", tr("ゲーム切り替え", "Game switch")),
+    ("bgm", "Ctrl+B", tr("BGMの再生・一時停止", "Play or pause BGM")),
+    ("video", "Ctrl+E", tr("映像切り替え", "Video switch")),
+    ("record_pause", "Ctrl+P", tr("録画の一時停止・再開", "Pause or resume recording")),
+    ("help", "F1", tr("キー操作の一覧", "Key list")),
 )
 
 # 窓内の固定キーのうち、同じキーが SR 音声トグルに設定されていたら
@@ -103,25 +104,29 @@ WINDOW_YIELD_TO_SR = ("help",)
 # キーで呼ぶのではなく、リストの上で意味を持つ操作。
 # メニューには出せないが、一覧には出さないと気づけない。
 CONTEXT_KEYS = (
-    ("Enter", "選んでいるリストに応じた操作"
-              "（配信・録画の開始と停止、シーンの切り替え、"
-              "表示の切り替え、ミュート、フィルターのオン・オフ）"),
+    ("Enter", tr("選んでいるリストに応じた操作"
+                 "（配信・録画の開始と停止、シーンの切り替え、"
+                 "表示の切り替え、ミュート、フィルターのオン・オフ）",
+       "Act on the selected list (start and stop streaming and recording, switch scenes, show or hide sources, mute, turn filters on or off)")),
     # ★「そのままEnterで開く」とは書かない。キーボードから開いた
     #   ポップアップメニューは、どの項目も選ばれていない状態で開く
     #   （実測。MSAAで focus=なし）。Enterだけでは何も起きずに閉じる。
-    ("アプリケーションキー", "選んでいるリストでできる操作の一覧を出す"
-                          "（下矢印で選んでEnter。先頭は設定）"),
+    (tr("アプリケーションキー", "Applications key"), tr("選んでいるリストでできる操作の一覧を出す"
+                             "（下矢印で選んでEnter。先頭は設定）",
+       "Show the actions available for the selected list (choose with Down Arrow and press Enter; the first item is Settings)")),
     # ★アプリケーションキーの無いキーボード向け。Windows 共通の代替キー
     #   なので、書いていないと「このパソコンでは出せない」と誤解される
-    ("Shift＋F10", "同じく、操作の一覧を出す"
-                  "（アプリケーションキーが無いキーボード用）"),
-    ("左右キー", "音声入力一覧にいるとき、音量を上げ下げする"),
-    ("Shift＋左右キー", "同じく、大きく上げ下げする"),
-    ("Alt＋上下キー", "ソース一覧にいるとき、選んでいるソースを"
-                     "前に出す・後ろに送る（重なり順。音は変わらない）"),
-    ("Escape", "設定の画面を閉じる。★OBSナビは終了しない"),
-    ("Alt＋F4", "OBSナビを終了する（メニューの「終了」でも同じ）"),
-    ("Alt または F10", "メニューバーを開く"),
+    (tr("Shift＋F10", "Shift+F10"), tr("同じく、操作の一覧を出す"
+                     "（アプリケーションキーが無いキーボード用）",
+       "Same, show the list of actions (for keyboards without an Applications key)")),
+    (tr("左右キー", "Left and Right Arrow"), tr("音声入力一覧にいるとき、音量を上げ下げする", "In the audio input list, lower or raise the volume")),
+    (tr("Shift＋左右キー", "Shift+Left and Right Arrow"), tr("同じく、大きく上げ下げする", "Same, in larger steps")),
+    (tr("Alt＋上下キー", "Alt+Up and Down Arrow"), tr("ソース一覧にいるとき、選んでいるソースを"
+                        "前に出す・後ろに送る（重なり順。音は変わらない）",
+       "In the source list, bring the selected source forward or send it backward (stacking order; does not change the sound)")),
+    ("Escape", tr("設定の画面を閉じる。★OBSナビは終了しない", "Close a settings dialog. Note: does not quit OBS Navi")),
+    (tr("Alt＋F4", "Alt+F4"), tr("OBSナビを終了する（メニューの「終了」でも同じ）", "Quit OBS Navi (same as Exit in the menu)")),
+    (tr("Alt または F10", "Alt or F10"), tr("メニューバーを開く", "Open the menu bar")),
 )
 
 # ------------------------------------------------------------
@@ -133,16 +138,16 @@ CONTEXT_KEYS = (
 #   同じで、利用者が設定した SR キーが固定キーに負けないようにするため
 #   （0.14.0 で末尾に回ってしまい、衝突時の勝者が入れ替わっていた）。
 GLOBAL_PLAN = (
-    ("state", "F5", "状態読み上げ"),
-    ("levels", "F6", "レベル読み上げ"),
-    ("volume_down", "F1", "音量を下げる"),
-    ("volume_up", "F2", "音量を上げる"),
-    ("volume_next", "F4", "音量を変える対象を次へ"),
-    ("stats", "F10", "統計読み上げ"),
-    ("virtual_cam", "F11", "仮想カメラの切り替え"),
-    ("replay", "F12", "リプレイを保存"),
-    ("game", "F3", "ゲーム切り替え"),
-    ("bgm", "F7", "BGMの再生・一時停止"),
+    ("state", "F5", tr("状態読み上げ", "Read status")),
+    ("levels", "F6", tr("レベル読み上げ", "Read levels")),
+    ("volume_down", "F1", tr("音量を下げる", "Lower volume")),
+    ("volume_up", "F2", tr("音量を上げる", "Raise volume")),
+    ("volume_next", "F4", tr("音量を変える対象を次へ", "Next target for volume")),
+    ("stats", "F10", tr("統計読み上げ", "Read statistics")),
+    ("virtual_cam", "F11", tr("仮想カメラの切り替え", "Toggle virtual camera")),
+    ("replay", "F12", tr("リプレイを保存", "Save replay")),
+    ("game", "F3", tr("ゲーム切り替え", "Game switch")),
+    ("bgm", "F7", tr("BGMの再生・一時停止", "Play or pause BGM")),
 )
 
 # SRトグルをこの action_id の直後に差し込む（上の★を参照）
@@ -153,16 +158,16 @@ _SR_INSERT_AFTER = "levels"
 # ------------------------------------------------------------
 # 音量の粗い刻み。キー名は固定
 COARSE_PLAN = (
-    ("volume_down_coarse", "F1", "音量を大きく下げる"),
-    ("volume_up_coarse", "F2", "音量を大きく上げる"),
+    ("volume_down_coarse", "F1", tr("音量を大きく下げる", "Lower volume in large steps")),
+    ("volume_up_coarse", "F2", tr("音量を大きく上げる", "Raise volume in large steps")),
 )
 
 # 設定でキー名を変えられるもの。(action_id, 設定の在りか, 説明)
 # ★空文字にすると割り当てない、という約束もここが持つ
 CONFIG_COARSE_PLAN = (
-    ("record_pause", ("record", "pause_hotkey"), "録画の一時停止・再開"),
-    ("chapter", ("record", "chapter_hotkey"), "チャプターを付ける"),
-    ("camera", ("camera", "hotkey"), "カメラの有効・無効"),
+    ("record_pause", ("record", "pause_hotkey"), tr("録画の一時停止・再開", "Pause or resume recording")),
+    ("chapter", ("record", "chapter_hotkey"), tr("チャプターを付ける", "Add chapter")),
+    ("camera", ("camera", "hotkey"), tr("カメラの有効・無効", "Enable or disable camera")),
 )
 
 # 配信・録画の開始と停止（0.18.2、ゲーム中でも効くように）。
@@ -177,10 +182,10 @@ CONFIG_COARSE_PLAN = (
 #   足してある。キー一覧で分からないと、1回押して案内を聞くまで
 #   気づけないため。メニューの文言は窓内キーの説明（WINDOW_PLAN）を使う
 OUTPUT_COARSE_PLAN = (
-    ("stream_start", "F6", "配信を開始（2回続けて押す）"),
-    ("stream_stop", "F7", "配信を停止（2回続けて押す）"),
-    ("record_start", "F8", "録画を開始"),
-    ("record_stop", "F9", "録画を停止"),
+    ("stream_start", "F6", tr("配信を開始（2回続けて押す）", "Start streaming (press twice in a row)")),
+    ("stream_stop", "F7", tr("配信を停止（2回続けて押す）", "Stop streaming (press twice in a row)")),
+    ("record_start", "F8", tr("録画を開始", "Start recording")),
+    ("record_stop", "F9", tr("録画を停止", "Stop recording")),
 )
 
 
@@ -204,7 +209,7 @@ def sr_toggle_label(name: str) -> str:
     メニュー・ヘルプ・重複警告のすべてがここを使う。文言を1か所に
     しないと、同じ操作が場面ごとに別の名前で読まれてしまう。
     """
-    return f"{name}の配信オン・オフ"
+    return tr(f"{name}の配信オン・オフ", f"Toggle {name} in the stream")
 
 
 def sr_entries(config):
@@ -314,7 +319,7 @@ def window_bindings(config) -> list[tuple[str, bool, bool, str, str]]:
     for action_id, keys, desc in WINDOW_PLAN:
         parsed = parse_window_key(keys)
         if parsed is None:
-            raise ValueError(f"WINDOW_PLAN のキー表記が不正です: {keys!r}")
+            raise ValueError(tr(f"WINDOW_PLAN のキー表記が不正です: {keys!r}", f"Invalid key notation in WINDOW_PLAN: {keys!r}"))
         ctrl, shift, key_name = parsed
         out.append((action_id, ctrl, shift, key_name, desc))
     return out
@@ -410,16 +415,16 @@ def help_text(config) -> str:
     window_rows = [r for r in rows if r.scope == SCOPE_WINDOW]
     global_rows = [r for r in rows if r.scope != SCOPE_WINDOW]
     if window_rows:
-        lines.append(f"【{SCOPE_LABEL[SCOPE_WINDOW]}】")
+        lines.append(tr(f"【{SCOPE_LABEL[SCOPE_WINDOW]}】", f"{SCOPE_LABEL[SCOPE_WINDOW]}:"))
         lines.extend(f"{r.keys}  {r.action}" for r in window_rows)
     if global_rows:
         if lines:
             lines.append("")
-        lines.append(f"【{SCOPE_LABEL[SCOPE_GLOBAL]}】")
+        lines.append(tr(f"【{SCOPE_LABEL[SCOPE_GLOBAL]}】", f"{SCOPE_LABEL[SCOPE_GLOBAL]}:"))
         lines.extend(f"{r.keys}  {r.action}" for r in global_rows)
     else:
         lines.append("")
-        lines.append("グローバルキーは無効になっています。")
+        lines.append(tr("グローバルキーは無効になっています。", "Global keys are turned off."))
     return "\n".join(lines)
 
 
@@ -448,7 +453,7 @@ def _dupe_text(key: str, winner: str, loser: str) -> str:
     ただし F1 は SR に譲り、SR 同士は先勝ち）ので、規則で書くと
     半分の場面で**実際と逆のことを読み上げる**（レビューで判明）。
     """
-    return f"{key}（{winner} が効きます。{loser} は効きません）"
+    return tr(f"{key}（{winner} が効きます。{loser} は効きません）", f"{key} ({winner} works. {loser} does not work)")
 
 
 def duplicate_bindings(config) -> list[str]:
@@ -505,7 +510,7 @@ def invalid_key_warnings(config) -> list[str]:
         raw = _dict_of(config, section).get(name, "")
         if raw and not normalize_key_name(raw):
             out.append(
-                f"{desc}のキー {raw} は使えません。F1からF12を指定してください")
+                tr(f"{desc}のキー {raw} は使えません。F1からF12を指定してください", f"The key {raw} for {desc} cannot be used. Specify F1 to F12"))
     # ★走査は sr_entries に一本化する（この関数だけ自前で回すと、
     #   有効性の判定が増えたときに登録・メニュー・一覧と食い違い、
     #   「一覧には出るのに効かない」を見つけられなくなる）
@@ -513,5 +518,5 @@ def invalid_key_warnings(config) -> list[str]:
         raw = source.get("key", "")
         if raw and not key:
             out.append(
-                f"{name}のキー {raw} は使えません。F1からF12を指定してください")
+                tr(f"{name}のキー {raw} は使えません。F1からF12を指定してください", f"The key {raw} for {name} cannot be used. Specify F1 to F12"))
     return out

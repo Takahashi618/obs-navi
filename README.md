@@ -1,5 +1,7 @@
 # OBSナビ
 
+English: [README.en.md](README.en.md)
+
 OBSナビは、スクリーンリーダー（PC-Talker・NVDA）で OBS Studio を操作するための Windows 用の道具です。
 
 OBS Studio の画面には、スクリーンリーダーで読めない・操作しにくいところが多くあります。OBSナビは、読み上げで扱いやすい自分の画面から OBS を操作します。操作には、OBS Studio に標準で入っている WebSocket という仕組みを使います。OBS は起動したままにしておき、その横で OBSナビを使います。OBS 本体で操作した変化（配信の開始やシーンの切り替えなど）も、OBSナビが読み上げます。
@@ -28,6 +30,7 @@ OBSナビのソースコードと文書は、AI（Anthropic の Claude）を使�
 - スクリーンリーダーの声を配信に乗せる・乗せないの切り替え
 - 配信中・録画中の、無音と音割れの警告。録画中の空き容量の警告
 - ゲーム中でも効くキー（配信・録画の開始と停止など）
+- 日本語と英語の表示（Windows の表示言語に合わせて自動で選び、「ツール」メニューの「表示の言語 (Language)」で変えられます）
 
 ## できないこと
 
@@ -46,7 +49,7 @@ OBSナビのソースコードと文書は、AI（Anthropic の Claude）を使�
 
 ## 使い方
 
-使い方の全体は、マニュアル（[docs/manual.html](docs/manual.html)）にあります。GitHub の画面では HTML のまま表示されるので、ダウンロードしてブラウザーで開いてください。見出しで移動しながら読めるように、章ごとに見出しを付けてあります。
+使い方の全体は、マニュアル（[docs/manual.html](docs/manual.html)。英語版は [docs/manual.en.html](docs/manual.en.html)）にあります。GitHub の画面では HTML のまま表示されるので、ダウンロードしてブラウザーで開いてください。見出しで移動しながら読めるように、章ごとに見出しを付けてあります。
 
 最初に必要なのは、OBS の WebSocket サーバーを有効にすることだけです。
 
@@ -83,6 +86,12 @@ OBS の設定画面が読み上げで扱いにくいときは、設定ファイ�
    python -X utf8 tests\run_tests.py
    ```
 
+   英語の表示に日本語が残っていないかは、別に確かめます（画面を英語で作って調べます）。
+
+   ```
+   python -X utf8 tests\en_probe.py
+   ```
+
 ## 実行ファイルの作り方
 
 1. PyInstaller を入れます。
@@ -97,7 +106,7 @@ OBS の設定画面が読み上げで扱いにくいときは、設定ファイ�
    python -X utf8 -m PyInstaller --noconfirm obs_navi.spec
    ```
 
-3. dist\OBSナビ\OBSナビ.exe ができます。
+3. dist\OBSNavi\OBSNavi.exe ができます。
 
 配布用の zip は、`python -X utf8 tools\build_release.py` で作ります。
 
@@ -106,11 +115,11 @@ OBS の設定画面が読み上げで扱いにくいときは、設定ファイ�
 - app.py は、起動の入口です
 - version.py は、版の番号です
 - speech.py は、スクリーンリーダーへの読み上げです
-- core フォルダは、OBS との通信と、画面に依存しない処理です。キーの定義は core\keymap.py にあります
+- core フォルダは、OBS との通信と、画面に依存しない処理です。キーの定義は core\keymap.py に、表示の言語の決め方は core\i18n.py にあります
 - ui フォルダは、画面（wxPython）です
 - tests フォルダは、テストです
 - tools フォルダは、文書の生成と検査、配布パッケージの作成です
-- docs フォルダは、マニュアルとテストのお願いの元の HTML です
+- docs フォルダは、マニュアルとテストのお願いの元の HTML です（manual.en.html と tester.en.html は英語版）
 - obs_navi.spec は、実行ファイルを作る設定（PyInstaller）です
 
 ## ライセンス

@@ -4,7 +4,10 @@
 ビルド:
     python -m PyInstaller --noconfirm obs_navi.spec
 出力:
-    dist\\OBSナビ\\OBSナビ.exe （フォルダ配布。設定ファイルは exe の隣に作られる）
+    dist\\OBSNavi\\OBSNavi.exe （フォルダ配布。設定ファイルは exe の隣に作られる）
+
+★名前は英字にする（0.20.1、利用者の指示）。配布物のファイル名に日本語が
+  あると、展開する道具や環境によって文字化けすることがあるため
 
 なぜ onefile にしないか:
     onefile は起動のたびに一時フォルダへ展開するため、wxPython を含む
@@ -64,7 +67,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="OBSナビ",
+    name="OBSNavi",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -86,5 +89,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="OBSナビ",
+    name="OBSNavi",
 )

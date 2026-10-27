@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OBS Navi 0.20.1 Testing Guide</title>
+<style>
+:root { color-scheme: light dark; }
+body {
+  font-family: "Segoe UI", sans-serif;
+  line-height: 1.7;
+  max-width: 52em;
+  margin: 0 auto;
+  padding: 1em 16px 3em;
+}
+h1 { font-size: 1.6em; }
+h2 { margin-top: 2.2em; border-bottom: 1px solid #888; }
+h3 { margin-top: 1.6em; }
+.box { border: 2px solid #888; border-radius: 4px; padding: 0.2em 1em; margin: 1em 0; }
+.template { border: 1px dashed #888; padding: 0.5em 1em; }
+</style>
+</head>
+<body>
+<h1>OBS Navi <span class="version">0.20.1</span> Testing Guide</h1>
+
+<p>Author: Takahashi. This is the English edition of the testing guide.</p>
+<p>Thank you for helping test OBS Navi. This document covers what to do before testing, what to check, and how to report. How to use OBS Navi is in the manual in the same folder (Manual (English).html or Manual (English).txt).</p>
+
+<nav aria-label="Contents">
+<h2 id="toc">Contents</h2>
+<p>There are 7 chapters.</p>
+<ol>
+<li><a href="#intro">What this test is for</a></li>
+<li><a href="#before">Before testing (important)</a></li>
+<li><a href="#setup">Setup</a></li>
+<li><a href="#check">What to check</a></li>
+<li><a href="#report">How to report</a></li>
+<li><a href="#known">Known issues</a></li>
+<li><a href="#share">About sharing</a></li>
+</ol>
+</nav>
+
+<h2 id="intro">1. What this test is for</h2>
+<p>OBS Navi is a tool for operating OBS Studio with a screen reader. It works in the author's environment (Windows 11, NVDA and PC-Talker, OBS Studio 32.2), but it has not yet been checked in other environments or by other people. This test is to find out three things:</p>
+<ol>
+<li>Whether starting, connecting, and speech work correctly in other environments</li>
+<li>Whether what is spoken is easy to understand, and whether anything is missing or too much</li>
+<li>Whether any steps are confusing or hard to get through</li>
+</ol>
+<p>Things you could not get to work are important results too. Please feel free to report them. This English edition is especially interested in how the English display and speech sound with your screen reader.</p>
+
+<h2 id="before">2. Before testing (important)</h2>
+
+<h3>2.1 Export your OBS settings</h3>
+<p>OBS Navi can create and delete scenes, sources, and filters. Deletion cannot be undone, so export your OBS settings before testing.</p>
+<ol>
+<li>In OBS, use Scene Collection menu (Alt+S), Export, to save the scene collection to a file.</li>
+<li>Use Profile menu (Alt+P), Export, to save the profile to a folder.</li>
+</ol>
+<p>To restore, use Import in the same menus.</p>
+<p>If you do not want to touch your usual setup, create a scene collection for testing with Scene Collection, New, and test there.</p>
+
+<h3>2.2 About testing streaming</h3>
+<p>OBS Navi can start a stream. Testing streaming is optional. If you try it, do so in a way that is fine if viewers see it (for example, an unlisted YouTube stream, or a stream titled "Test").</p>
+<p>Recording sends nothing anywhere, so you can try it safely. Recorded files stay in the OBS recording folder; delete them if you do not need them.</p>
+
+<h3>2.3 What OBS Navi adds to OBS</h3>
+<p>The following actions make OBS Navi add inputs or sources to the current OBS scene, or change source settings.</p>
+<ul>
+<li>Creating a screen reader voice input (the first time you press F8 or F9; the new input starts muted)</li>
+<li>Creating the BGM source (the first time you press Ctrl+B)</li>
+<li>Game switch (changes the target window of game capture and similar sources)</li>
+<li>Recording audio tracks (only when you use Recording track settings or the recording track rows in source settings; changes the OBS recording settings and the per-source track settings)</li>
+</ul>
+<p>When you no longer need them, delete them with Delete source in OBS Navi or in OBS itself.</p>
+
+<h2 id="setup">3. Setup</h2>
+<p>Follow "3. Setup and starting" in the Manual. Enable the OBS WebSocket server, then start OBS Navi. When it reads "Connected to OBS", you are ready.</p>
+<p>If you get stuck here, that in itself is an important result. Please tell us where, and what was read.</p>
+
+<h2 id="check">4. What to check</h2>
+<p>Each item is numbered. When reporting, it helps if you write the number, such as "4.1 item 3". You do not have to do all of them.</p>
+
+<h3>4.1 Please check these first</h3>
+<p>There are 12 items.</p>
+<ol>
+<li>At startup, whether "OBS Navi version <span class="version">0.20.1</span> status" is read to the end, followed by "Connected to OBS" and the status</li>
+<li>Whether OBS Navi started in English (it follows the Windows display language). Whether choosing <span lang="ja">表示の言語</span> (Language) in the Tools menu lets you switch between English and Japanese, and whether the restart works</li>
+<li>When you move through the 6 fields with Tab (status, stream and record, scene list, source list, audio input list, filter list), whether the field name and the selected item are read</li>
+<li>When you open the menu bar with Alt or F10 and move between menus with Left and Right Arrow and between items with Up and Down Arrow, whether item names and keys are read</li>
+<li>Whether the Applications key in a list shows the list of actions. On keyboards without an Applications key, whether Shift+F10 shows it</li>
+<li>Whether the F1 key list can be read one line at a time with Up and Down Arrow</li>
+<li>Whether Enter in the scene list switches scenes and reads "Scene …"</li>
+<li>Whether Enter in the source list shows and hides the source</li>
+<li>Whether Enter in the audio input list toggles mute, and whether Left and Right Arrow change the volume and read the value</li>
+<li>Whether F5 reads the status and F6 reads the levels</li>
+<li>Starting (Ctrl+R) and stopping (Ctrl+Shift+R) recording, and whether the file name is read when stopping</li>
+<li>Whether About OBS Navi in the Help menu reads the version, that it was made with AI, and the license</li>
+</ol>
+
+<h3>4.2 Please check these if you can</h3>
+<p>There are 8 items.</p>
+<ol>
+<li>Keys that work anywhere: while using another app (Notepad, a game, and so on), whether Ctrl+Alt+F5 (status) and Ctrl+Alt+F6 (levels) work</li>
+<li>If "The following global hotkeys could not be registered" is read at startup, please tell us which keys. Your screen reader or another app may be using the same keys</li>
+<li>Whether your screen reader or a game takes any OBS Navi keys first so they do not work. Especially Ctrl+Shift+S, Ctrl+Shift+R, Ctrl+Alt+Shift+F6 to F9, and Alt+Up and Down Arrow in the source list</li>
+<li>After changing the stacking order with Alt+Up and Down Arrow in the source list, whether the menu bar stays closed even if you release Alt before the arrow key</li>
+<li>Whether the order dialogs (such as Scene list order) are easy to understand by speech</li>
+<li>Whichever you normally use of: source settings, adding and configuring filters, checking cameras, BGM, game switch, and video switch</li>
+<li>Sending screen reader voices to the stream (NVDA needs setup; see 9.5 in the Manual). Record with it on and with it off, and check whether the voice is or is not in the recording</li>
+<li>Recording audio tracks (6.9 in the Manual). Use the recommended assignment, record, and check in an editing program whether the tracks are split into 4. Whether Read recording track assignment is easy to understand</li>
+</ol>
+
+<h3>4.3 If you can test streaming</h3>
+<p>There are 3 items.</p>
+<ol>
+<li>Starting (Ctrl+S) and stopping (Ctrl+Shift+S) streaming. Whether you can choose Yes in the confirmation</li>
+<li>The streaming keys that work anywhere (Ctrl+Alt+Shift+F6 to start and F7 to stop, both pressed twice in a row). Whether the length of the first message, "Press again to start streaming", and the 8-second window are enough at your speech rate</li>
+<li>Whether the silence and clipping warnings during a stream are too frequent or not frequent enough</li>
+</ol>
+
+<h3>4.4 Use it freely</h3>
+<p>Try it in your usual streaming and recording, and tell us what was confusing, features you would like, and where speech felt like too much or too little.</p>
+
+<h2 id="report">5. How to report</h2>
+<p>Please report problems and anything you notice to the author (Takahashi). The following makes it easier to find the cause.</p>
+<ul>
+<li>The OBS Navi version (this package is <span class="version">0.20.1</span>; About OBS Navi in the Help menu also reads it)</li>
+<li>The Windows version (10 or 11) and its display language</li>
+<li>The name and version of your screen reader</li>
+<li>The OBS Studio version (About OBS Navi also reads the version of the connected OBS)</li>
+<li>What you did (the keys you pressed and menus you chose, in order)</li>
+<li>What was read (as you heard it is fine; if there was an error message, the exact message)</li>
+<li>What you expected to happen</li>
+<li>Whether it happens every time or only sometimes</li>
+</ul>
+<p>You can copy and use the template below. It has 8 lines.</p>
+<p class="template">OBS Navi version: <span class="version">0.20.1</span><br>
+Windows and display language:<br>
+Screen reader:<br>
+OBS Studio version:<br>
+What I did:<br>
+What was read:<br>
+What I expected:<br>
+Every time or sometimes:</p>
+<p>Sending the settings file (obs_navi_config.json in the same folder as OBSNavi.exe) along with your report can help find the cause. Unless you wrote it there yourself, this file does not contain your OBS password.</p>
+
+<h2 id="known">6. Known issues</h2>
+<p>The author already knows about the following, so there is no need to report them. There are 6 items.</p>
+<ul>
+<li>If there is no source named "Game Audio", game switch reads "No target found for Game Audio. Start the game, then…". The cause is the missing source, but it suggests starting the game (see 8.3 in the Manual for what to do)</li>
+<li>If you hold down Enter on Start streaming in the Stream and record list, the confirmation closes with No (the stream does not start)</li>
+<li>Video filters (such as chroma key) cannot be added</li>
+<li>The scene order changes only inside OBS Navi. The order in OBS itself does not change</li>
+<li>Sending the NVDA voice to the stream needs VB-CABLE to be set up</li>
+<li>Problems with how the OBS window itself is read cannot be fixed from OBS Navi</li>
+</ul>
+
+<h2 id="share">7. About sharing</h2>
+<p>OBS Navi is distributed under the GNU GPL version 3. Under the license, you are free to share it with others. However, it is still being tested and a fixed version will be provided later, so please refrain from sharing it if you can. This is a request from the author, not a condition of the license.</p>
+
+<p>This is the end of the testing guide. Thank you very much for your help.</p>
+</body>
+</html>

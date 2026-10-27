@@ -12,6 +12,9 @@ import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from . import i18n
+from .i18n import tr
+
 CONFIG_FILENAME = "obs_navi_config.json"
 
 
@@ -50,9 +53,9 @@ def obs_websocket_config_path() -> Path:
 def _default_sr_sources() -> list:
     """sr_sources の既定値（正規化のフォールバックにも使う）。"""
     return [
-        {"name": "NVDA音声", "method": "device",
+        {"name": tr("NVDA音声", "NVDA Voice"), "method": "device",
          "device_match": "CABLE Output", "key": "F8"},
-        {"name": "PC-Talker音声", "method": "app",
+        {"name": tr("PC-Talker音声", "PC-Talker Voice"), "method": "app",
          "exe": "PCTalker.exe", "key": "F9"},
     ]
 
@@ -170,6 +173,10 @@ class Config:
 
     host: str = "localhost"
     port: int = 4455
+    # 表示と読み上げの言語。"auto"＝PC の表示言語に合わせる（日本語なら
+    # 日本語、それ以外は英語）、"ja"、"en"。「ツール」メニューの
+    # 「表示の言語」から選ぶ。★起動したときに1回だけ効く（core/i18n.py）
+    language: str = "auto"
     password: str = ""            # 空なら OBS 設定からの自動取得に頼る
     auto_password: bool = True    # OBS設定ファイルからポート・パスワードを取る
     # スクリーンリーダーごとの音声入力。配信オン・オフを個別に管理する。
@@ -211,8 +218,8 @@ class Config:
     #                  （排他フルスクリーンのゲームだと最小化されることが
     #                    あるので切れるようにしてある）
     game_switch: dict = field(default_factory=lambda: {
-        "video_source": "ゲームキャプチャ",
-        "audio_sources": ["ゲーム音"],
+        "video_source": tr("ゲームキャプチャ", "Game Capture"),
+        "audio_sources": [tr("ゲーム音", "Game Audio")],
         "also_audio": True,
         "raise_window": True,
     })
@@ -220,7 +227,7 @@ class Config:
     # 既存の「BGM」（アプリ音声キャプチャ）とは別名にする。入力の種別は
     # 後から変更できないため、ファイル再生には別入力が要るため。
     bgm: dict = field(default_factory=lambda: {
-        "source_name": "BGM音楽",
+        "source_name": tr("BGM音楽", "BGM Music"),
         "last_dir": "",
     })
     # 映像切り替え（重なり順で切り替える）。
@@ -295,11 +302,11 @@ class Config:
         キーの有無を気にせず済むようにする。
         """
         for name, defaults in (
-            ("game_switch", {"video_source": "ゲームキャプチャ",
-                             "audio_sources": ["ゲーム音"],
+            ("game_switch", {"video_source": tr("ゲームキャプチャ", "Game Capture"),
+                             "audio_sources": [tr("ゲーム音", "Game Audio")],
                              "also_audio": True,
                              "raise_window": True}),
-            ("bgm", {"source_name": "BGM音楽", "last_dir": ""}),
+            ("bgm", {"source_name": tr("BGM音楽", "BGM Music"), "last_dir": ""}),
             ("video_switch", {"extra_kinds": []}),
             ("record", {"pause_reminder_seconds": 300.0,
                         "disk_warn_mb": 10240.0,
@@ -354,7 +361,7 @@ class Config:
             self.game_switch["audio_sources"] = [
                 a for a in audio if isinstance(a, str) and a]
         else:
-            self.game_switch["audio_sources"] = ["ゲーム音"]
+            self.game_switch["audio_sources"] = [tr("ゲーム音", "Game Audio")]
         extra = self.video_switch.get("extra_kinds")
         if isinstance(extra, str):
             self.video_switch["extra_kinds"] = [extra]
@@ -375,11 +382,20 @@ class Config:
         for key in ("scenes", "items"):
             self.list_order[key] = _clean_name_list(self.list_order.get(key))
 
+        # 手編集で "English" や "日本語" などと書かれても落ちないよう寄せる
+        self.language = i18n.normalize_setting(self.language)
+
     @classmethod
     def load(cls, path: Path | None = None) -> "Config":
-        """設定を読み込む。無ければ既定値でファイルを作る。"""
+        """設定を読み込む。無ければ既定値でファイルを作る。
+
+        ★表示の言語もここで決める（i18n.init）。既定のソース名
+        （「ゲームキャプチャ」など）は言語で変わるので、設定を作る前に
+        決めておく必要がある。
+        """
         p = path if path is not None else default_config_path()
         if not p.exists():
+            i18n.init(None)
             cfg = cls()
             try:
                 cfg.save(p)
@@ -389,9 +405,12 @@ class Config:
         try:
             raw = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
+            i18n.init(None)
             return cls._unsaveable()
         if not isinstance(raw, dict):
+            i18n.init(None)
             return cls._unsaveable()
+        i18n.init(raw.get("language"))
         known = set(cls.__dataclass_fields__)
         data = {k: v for k, v in raw.items() if k in known}
         try:

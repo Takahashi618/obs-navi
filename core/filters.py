@@ -25,6 +25,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .i18n import tr
+
 # フィルター設定を書くときは常に上書きマージ。props.apply_input_settings と
 # 同じ理由（overlay=False は指定しなかった設定を既定へ戻す）。
 
@@ -56,103 +58,103 @@ class FilterProp:
 #   3項目に聞こえる）。props.py の PRIORITY_JP が同じ理由で読点を避けている。
 #   説明を足したいときは空白で区切る。
 _SUPPRESS_METHODS = (
-    ("rnnoise", "標準 品質がよい"),
-    ("speex", "軽量 CPUに優しい"),
+    ("rnnoise", tr("標準 品質がよい", "Standard good quality")),
+    ("speex", tr("軽量 CPUに優しい", "Light easy on the CPU")),
 )
 _DETECTORS = (
-    ("RMS", "平均 なめらか"),
-    ("peak", "ピーク 素早い"),
+    ("RMS", tr("平均 なめらか", "RMS smooth")),
+    ("peak", tr("ピーク 素早い", "Peak fast")),
 )
 _EXPANDER_PRESETS = (
-    ("expander", "エキスパンダー ゆるやかに下げる"),
-    ("gate", "ゲート しっかり閉じる"),
+    ("expander", tr("エキスパンダー ゆるやかに下げる", "Expander lowers gently")),
+    ("gate", tr("ゲート しっかり閉じる", "Gate closes firmly")),
 )
 
 # 種別 → 編集できる項目。使用頻度順に並べる（先頭ほど触ることが多い）。
 FILTER_TABLE: dict[str, list[FilterProp]] = {
     "noise_suppress_filter_v2": [
-        FilterProp("method", "方式", "choice", choices=_SUPPRESS_METHODS),
-        FilterProp("suppress_level", "抑制レベル", "int",
-                   min_value=-60, max_value=0, unit="デシベル",
+        FilterProp("method", tr("方式", "Method"), "choice", choices=_SUPPRESS_METHODS),
+        FilterProp("suppress_level", tr("抑制レベル", "Suppression level"), "int",
+                   min_value=-60, max_value=0, unit=tr("デシベル", " decibels"),
                    depends_on=("method", "speex")),
     ],
     "noise_suppress_filter": [
-        FilterProp("method", "方式", "choice", choices=_SUPPRESS_METHODS),
-        FilterProp("suppress_level", "抑制レベル", "int",
-                   min_value=-60, max_value=0, unit="デシベル",
+        FilterProp("method", tr("方式", "Method"), "choice", choices=_SUPPRESS_METHODS),
+        FilterProp("suppress_level", tr("抑制レベル", "Suppression level"), "int",
+                   min_value=-60, max_value=0, unit=tr("デシベル", " decibels"),
                    depends_on=("method", "speex")),
     ],
     "noise_gate_filter": [
-        FilterProp("open_threshold", "開くしきい値", "float",
-                   min_value=-96.0, max_value=0.0, unit="デシベル"),
-        FilterProp("close_threshold", "閉じるしきい値", "float",
-                   min_value=-96.0, max_value=0.0, unit="デシベル"),
-        FilterProp("attack_time", "開く速さ", "int",
-                   min_value=0, max_value=500, unit="ミリ秒"),
-        FilterProp("hold_time", "開いたままの時間", "int",
-                   min_value=0, max_value=1000, unit="ミリ秒"),
-        FilterProp("release_time", "閉じる速さ", "int",
-                   min_value=0, max_value=1000, unit="ミリ秒"),
+        FilterProp("open_threshold", tr("開くしきい値", "Open threshold"), "float",
+                   min_value=-96.0, max_value=0.0, unit=tr("デシベル", " decibels")),
+        FilterProp("close_threshold", tr("閉じるしきい値", "Close threshold"), "float",
+                   min_value=-96.0, max_value=0.0, unit=tr("デシベル", " decibels")),
+        FilterProp("attack_time", tr("開く速さ", "Attack"), "int",
+                   min_value=0, max_value=500, unit=tr("ミリ秒", " milliseconds")),
+        FilterProp("hold_time", tr("開いたままの時間", "Hold"), "int",
+                   min_value=0, max_value=1000, unit=tr("ミリ秒", " milliseconds")),
+        FilterProp("release_time", tr("閉じる速さ", "Release"), "int",
+                   min_value=0, max_value=1000, unit=tr("ミリ秒", " milliseconds")),
     ],
     "compressor_filter": [
-        FilterProp("ratio", "比率", "float",
-                   min_value=1.0, max_value=32.0, unit="対1"),
-        FilterProp("threshold", "しきい値", "float",
-                   min_value=-60.0, max_value=0.0, unit="デシベル"),
-        FilterProp("attack_time", "効き始める速さ", "int",
-                   min_value=1, max_value=500, unit="ミリ秒"),
-        FilterProp("release_time", "戻る速さ", "int",
-                   min_value=1, max_value=1000, unit="ミリ秒"),
-        FilterProp("output_gain", "出力ゲイン", "float",
-                   min_value=-32.0, max_value=32.0, unit="デシベル"),
-        FilterProp("sidechain_source", "サイドチェーンの元", "source"),
+        FilterProp("ratio", tr("比率", "Ratio"), "float",
+                   min_value=1.0, max_value=32.0, unit=tr("対1", " to 1")),
+        FilterProp("threshold", tr("しきい値", "Threshold"), "float",
+                   min_value=-60.0, max_value=0.0, unit=tr("デシベル", " decibels")),
+        FilterProp("attack_time", tr("効き始める速さ", "Attack"), "int",
+                   min_value=1, max_value=500, unit=tr("ミリ秒", " milliseconds")),
+        FilterProp("release_time", tr("戻る速さ", "Release"), "int",
+                   min_value=1, max_value=1000, unit=tr("ミリ秒", " milliseconds")),
+        FilterProp("output_gain", tr("出力ゲイン", "Output gain"), "float",
+                   min_value=-32.0, max_value=32.0, unit=tr("デシベル", " decibels")),
+        FilterProp("sidechain_source", tr("サイドチェーンの元", "Sidechain source"), "source"),
     ],
     "upward_compressor_filter": [
-        FilterProp("ratio", "比率", "float",
-                   min_value=1.0, max_value=20.0, unit="対1"),
-        FilterProp("threshold", "しきい値", "float",
-                   min_value=-60.0, max_value=0.0, unit="デシベル"),
-        FilterProp("attack_time", "効き始める速さ", "int",
-                   min_value=1, max_value=500, unit="ミリ秒"),
-        FilterProp("release_time", "戻る速さ", "int",
-                   min_value=1, max_value=1000, unit="ミリ秒"),
-        FilterProp("output_gain", "出力ゲイン", "float",
-                   min_value=-32.0, max_value=32.0, unit="デシベル"),
-        FilterProp("knee_width", "かかり始めのなめらかさ", "int",
-                   min_value=0, max_value=20, unit="デシベル"),
-        FilterProp("detector", "検出のしかた", "choice", choices=_DETECTORS),
+        FilterProp("ratio", tr("比率", "Ratio"), "float",
+                   min_value=1.0, max_value=20.0, unit=tr("対1", " to 1")),
+        FilterProp("threshold", tr("しきい値", "Threshold"), "float",
+                   min_value=-60.0, max_value=0.0, unit=tr("デシベル", " decibels")),
+        FilterProp("attack_time", tr("効き始める速さ", "Attack"), "int",
+                   min_value=1, max_value=500, unit=tr("ミリ秒", " milliseconds")),
+        FilterProp("release_time", tr("戻る速さ", "Release"), "int",
+                   min_value=1, max_value=1000, unit=tr("ミリ秒", " milliseconds")),
+        FilterProp("output_gain", tr("出力ゲイン", "Output gain"), "float",
+                   min_value=-32.0, max_value=32.0, unit=tr("デシベル", " decibels")),
+        FilterProp("knee_width", tr("かかり始めのなめらかさ", "Knee width"), "int",
+                   min_value=0, max_value=20, unit=tr("デシベル", " decibels")),
+        FilterProp("detector", tr("検出のしかた", "Detection"), "choice", choices=_DETECTORS),
     ],
     "limiter_filter": [
-        FilterProp("threshold", "しきい値", "float",
-                   min_value=-60.0, max_value=0.0, unit="デシベル"),
-        FilterProp("release_time", "戻る速さ", "int",
-                   min_value=1, max_value=1000, unit="ミリ秒"),
+        FilterProp("threshold", tr("しきい値", "Threshold"), "float",
+                   min_value=-60.0, max_value=0.0, unit=tr("デシベル", " decibels")),
+        FilterProp("release_time", tr("戻る速さ", "Release"), "int",
+                   min_value=1, max_value=1000, unit=tr("ミリ秒", " milliseconds")),
     ],
     "expander_filter": [
-        FilterProp("ratio", "比率", "float",
-                   min_value=1.0, max_value=20.0, unit="対1"),
-        FilterProp("threshold", "しきい値", "float",
-                   min_value=-60.0, max_value=0.0, unit="デシベル"),
-        FilterProp("attack_time", "効き始める速さ", "int",
-                   min_value=1, max_value=100, unit="ミリ秒"),
-        FilterProp("release_time", "戻る速さ", "int",
-                   min_value=1, max_value=1000, unit="ミリ秒"),
-        FilterProp("output_gain", "出力ゲイン", "float",
-                   min_value=-32.0, max_value=32.0, unit="デシベル"),
-        FilterProp("detector", "検出のしかた", "choice", choices=_DETECTORS),
-        FilterProp("presets", "動作の型", "choice", choices=_EXPANDER_PRESETS),
+        FilterProp("ratio", tr("比率", "Ratio"), "float",
+                   min_value=1.0, max_value=20.0, unit=tr("対1", " to 1")),
+        FilterProp("threshold", tr("しきい値", "Threshold"), "float",
+                   min_value=-60.0, max_value=0.0, unit=tr("デシベル", " decibels")),
+        FilterProp("attack_time", tr("効き始める速さ", "Attack"), "int",
+                   min_value=1, max_value=100, unit=tr("ミリ秒", " milliseconds")),
+        FilterProp("release_time", tr("戻る速さ", "Release"), "int",
+                   min_value=1, max_value=1000, unit=tr("ミリ秒", " milliseconds")),
+        FilterProp("output_gain", tr("出力ゲイン", "Output gain"), "float",
+                   min_value=-32.0, max_value=32.0, unit=tr("デシベル", " decibels")),
+        FilterProp("detector", tr("検出のしかた", "Detection"), "choice", choices=_DETECTORS),
+        FilterProp("presets", tr("動作の型", "Preset"), "choice", choices=_EXPANDER_PRESETS),
     ],
     "gain_filter": [
-        FilterProp("db", "ゲイン", "float",
-                   min_value=-30.0, max_value=30.0, unit="デシベル"),
+        FilterProp("db", tr("ゲイン", "Gain"), "float",
+                   min_value=-30.0, max_value=30.0, unit=tr("デシベル", " decibels")),
     ],
     "basic_eq_filter": [
-        FilterProp("low", "低音", "float",
-                   min_value=-20.0, max_value=20.0, unit="デシベル"),
-        FilterProp("mid", "中音", "float",
-                   min_value=-20.0, max_value=20.0, unit="デシベル"),
-        FilterProp("high", "高音", "float",
-                   min_value=-20.0, max_value=20.0, unit="デシベル"),
+        FilterProp("low", tr("低音", "Low"), "float",
+                   min_value=-20.0, max_value=20.0, unit=tr("デシベル", " decibels")),
+        FilterProp("mid", tr("中音", "Mid"), "float",
+                   min_value=-20.0, max_value=20.0, unit=tr("デシベル", " decibels")),
+        FilterProp("high", tr("高音", "High"), "float",
+                   min_value=-20.0, max_value=20.0, unit=tr("デシベル", " decibels")),
     ],
     # 設定を持たないが、オン・オフだけで意味があるフィルター。
     # 表には空で載せる（「変えられません」ではなく「設定はありません」と
@@ -180,32 +182,32 @@ class FilterKindInfo:
 #   このアプリの数値入力では設定できない。
 AUDIO_FILTER_KINDS: list[FilterKindInfo] = [
     FilterKindInfo(
-        "noise_suppress_filter_v2", "ノイズ抑制",
-        "エアコンやパソコンのファンなど、ずっと鳴っている音を減らします"),
+        "noise_suppress_filter_v2", tr("ノイズ抑制", "Noise Suppression"),
+        tr("エアコンやパソコンのファンなど、ずっと鳴っている音を減らします", "Reduces constant sounds such as air conditioners and computer fans")),
     FilterKindInfo(
-        "noise_gate_filter", "ノイズゲート",
-        "小さい音のときは音を止めます。話していない間の物音を消せます"),
+        "noise_gate_filter", tr("ノイズゲート", "Noise Gate"),
+        tr("小さい音のときは音を止めます。話していない間の物音を消せます", "Mutes the sound when it is quiet. Removes noise while you are not talking")),
     FilterKindInfo(
-        "compressor_filter", "コンプレッサー",
-        "大きい音を抑えて音量を揃えます。声が聞き取りやすくなります"),
+        "compressor_filter", tr("コンプレッサー", "Compressor"),
+        tr("大きい音を抑えて音量を揃えます。声が聞き取りやすくなります", "Tames loud sounds to even out the volume. Makes your voice easier to hear")),
     FilterKindInfo(
-        "limiter_filter", "リミッター",
-        "決めた大きさを超えないようにします。音割れを防げます"),
+        "limiter_filter", tr("リミッター", "Limiter"),
+        tr("決めた大きさを超えないようにします。音割れを防げます", "Keeps the sound from going over a set level. Prevents clipping")),
     FilterKindInfo(
-        "gain_filter", "ゲイン",
-        "音量を上げ下げします。マイクが小さいときに使います"),
+        "gain_filter", tr("ゲイン", "Gain"),
+        tr("音量を上げ下げします。マイクが小さいときに使います", "Raises or lowers the volume. Use it when the microphone is too quiet")),
     FilterKindInfo(
-        "basic_eq_filter", "イコライザー",
-        "低音・中音・高音の量を変えます"),
+        "basic_eq_filter", tr("イコライザー", "Equalizer"),
+        tr("低音・中音・高音の量を変えます", "Changes the amount of low, mid, and high frequencies")),
     FilterKindInfo(
-        "expander_filter", "エキスパンダー",
-        "小さい音をさらに小さくします。ノイズゲートよりゆるやかです"),
+        "expander_filter", tr("エキスパンダー", "Expander"),
+        tr("小さい音をさらに小さくします。ノイズゲートよりゆるやかです", "Makes quiet sounds even quieter. Gentler than a noise gate")),
     FilterKindInfo(
-        "upward_compressor_filter", "アップワードコンプレッサー",
-        "小さい音を持ち上げます。ささやき声を聞こえやすくします"),
+        "upward_compressor_filter", tr("アップワードコンプレッサー", "Upward Compressor"),
+        tr("小さい音を持ち上げます。ささやき声を聞こえやすくします", "Lifts quiet sounds. Makes whispers easier to hear")),
     FilterKindInfo(
-        "invert_polarity_filter", "位相反転",
-        "音の波を反転します。2本のマイクが打ち消し合うときに使います"),
+        "invert_polarity_filter", tr("位相反転", "Invert Polarity"),
+        tr("音の波を反転します。2本のマイクが打ち消し合うときに使います", "Inverts the sound wave. Use it when two microphones cancel each other out")),
 ]
 
 # 「マイクに入れるならまずこれ」の並び。追加ダイアログの初期選択に使う。

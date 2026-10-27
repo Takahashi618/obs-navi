@@ -24,6 +24,8 @@ import threading
 from collections import deque
 from dataclasses import dataclass, field
 
+from .i18n import tr
+
 SILENCE_FLOOR_DB = -120.0
 
 
@@ -208,7 +210,7 @@ class LevelMonitor:
                 warnings.append(LevelWarning(
                     kind="clip",
                     input_name=input_name,
-                    message=f"{input_name} が音割れしています",
+                    message=tr(f"{input_name} が音割れしています", f"{input_name} is clipping"),
                 ))
 
         # 無音判定
@@ -232,6 +234,6 @@ class LevelMonitor:
                     warnings.append(LevelWarning(
                         kind="silence",
                         input_name=input_name,
-                        message=f"{input_name} が{secs}秒以上無音です",
+                        message=tr(f"{input_name} が{secs}秒以上無音です", f"{input_name} has been silent for {secs} seconds or more"),
                     ))
         return warnings

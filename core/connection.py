@@ -14,6 +14,7 @@ from obsws_python.error import OBSSDKError
 from obsws_python.subs import Subs
 
 from .config import Config
+from .i18n import tr
 
 
 class ObsConnectError(Exception):
@@ -37,8 +38,9 @@ class ObsConnection:
         host, port, password = self.config.resolve_connection()
         if not password:
             raise ObsConnectError(
-                "WebSocketのパスワードが取得できません。OBSのツールメニューから"
-                "WebSocketサーバー設定を確認してください"
+                tr("WebSocketのパスワードが取得できません。OBSのツールメニューから"
+                   "WebSocketサーバー設定を確認してください",
+                   "Could not get the WebSocket password. Check the WebSocket Server Settings in the OBS Tools menu")
             )
         try:
             self.req = obs.ReqClient(
@@ -54,16 +56,16 @@ class ObsConnection:
         except ConnectionRefusedError as exc:
             self.close()
             raise ObsConnectError(
-                "OBSに接続できません。OBSが起動しているか確認してください"
+                tr("OBSに接続できません。OBSが起動しているか確認してください", "Could not connect to OBS. Check that OBS is running")
             ) from exc
         except OBSSDKError as exc:
             self.close()
             raise ObsConnectError(
-                f"OBSとの認証に失敗しました。パスワード設定を確認してください（{exc}）"
+                tr(f"OBSとの認証に失敗しました。パスワード設定を確認してください（{exc}）", f"Authentication with OBS failed. Check the password setting ({exc})")
             ) from exc
         except OSError as exc:
             self.close()
-            raise ObsConnectError(f"OBSに接続できません（{exc}）") from exc
+            raise ObsConnectError(tr(f"OBSに接続できません（{exc}）", f"Could not connect to OBS ({exc})")) from exc
         except Exception as exc:  # noqa: BLE001
             # websocket-client の WebSocketTimeoutException 等は OSError の
             # 子ではないため、上の節では受からない。ここで受けないと UI 側へ
@@ -72,7 +74,7 @@ class ObsConnection:
             # 効くのにイベント読み上げだけが全滅する片肺状態になるので、
             # どの失敗でも必ず close() してから ObsConnectError に変換する。
             self.close()
-            raise ObsConnectError(f"OBSに接続できません（{exc}）") from exc
+            raise ObsConnectError(tr(f"OBSに接続できません（{exc}）", f"Could not connect to OBS ({exc})")) from exc
         if callbacks:
             self.events.callback.register(callbacks)
 

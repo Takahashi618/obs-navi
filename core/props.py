@@ -17,6 +17,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from .i18n import tr
+
 # メディア操作（TriggerMediaInputAction に渡す完全な識別子）。
 # 誤った文字列は 400 InvalidRequestField になるため定数化しておく。
 MEDIA_PLAY = "OBS_WEBSOCKET_MEDIA_INPUT_ACTION_PLAY"
@@ -36,9 +38,9 @@ MONITOR_AND_OUTPUT = "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT"
 MONITOR_CHOICES = [MONITOR_NONE, MONITOR_ONLY, MONITOR_AND_OUTPUT]
 # 内部名ではなく「何が起きるか」で読ませる（用語だけでは判断できないため）
 MONITOR_JP = {
-    MONITOR_NONE: "オフ、配信に乗るが自分には聞こえない",
-    MONITOR_ONLY: "自分だけ聞く、配信には乗らない",
-    MONITOR_AND_OUTPUT: "自分も聞く、配信にも乗る",
+    MONITOR_NONE: tr("オフ、配信に乗るが自分には聞こえない", "Off, sent to the stream but you do not hear it"),
+    MONITOR_ONLY: tr("自分だけ聞く、配信には乗らない", "Monitor only, not sent to the stream"),
+    MONITOR_AND_OUTPUT: tr("自分も聞く、配信にも乗る", "Monitor and output, you hear it and it is sent to the stream"),
 }
 # 設定値ではなく専用APIで扱うので、キーは他と衝突しない名前にしておく
 MONITOR_KEY = "__monitor__"
@@ -60,13 +62,13 @@ COLOR_KIND = "color_source_v3"
 # 実測で 4278190335 = 0xFF0000FF が赤になることを確認している。
 # 色そのものは読み上げても分からないので、名前で選べるようにする。
 COLOR_CHOICES = (
-    (4278190080, "黒"),
-    (4294967295, "白"),
-    (4278190335, "赤"),
-    (4278255360, "緑"),
-    (4294901760, "青"),
-    (4278255615, "黄"),
-    (4278222848, "クロマキー用の緑"),
+    (4278190080, tr("黒", "Black")),
+    (4294967295, tr("白", "White")),
+    (4278190335, tr("赤", "Red")),
+    (4278255360, tr("緑", "Green")),
+    (4294901760, tr("青", "Blue")),
+    (4278255615, tr("黄", "Yellow")),
+    (4278222848, tr("クロマキー用の緑", "Chroma key green")),
 )
 
 # 一致方式(priority)の値。★並び順と値が一致しないので必ず値で扱う
@@ -110,23 +112,23 @@ class PropSpec:
 PROP_TABLE: dict[str, list[PropSpec]] = {
     GAME_CAPTURE_KIND: [
         # 使用頻度順。ゲームを変えるとき触るのは window なので先頭に置く。
-        PropSpec("window", "対象ウィンドウ", "list", running_flag=True),
-        PropSpec("capture_mode", "取り込み方法", "list"),
-        PropSpec("priority", "一致の優先", "list"),
-        PropSpec("capture_cursor", "マウスカーソルを含める", "bool"),
-        PropSpec("capture_audio", "ゲーム音も取り込む", "bool"),
+        PropSpec("window", tr("対象ウィンドウ", "Window"), "list", running_flag=True),
+        PropSpec("capture_mode", tr("取り込み方法", "Capture method"), "list"),
+        PropSpec("priority", tr("一致の優先", "Window match priority"), "list"),
+        PropSpec("capture_cursor", tr("マウスカーソルを含める", "Capture cursor"), "bool"),
+        PropSpec("capture_audio", tr("ゲーム音も取り込む", "Capture audio"), "bool"),
     ],
     APP_AUDIO_KIND: [
-        PropSpec("window", "対象アプリ", "list", running_flag=True),
-        PropSpec("priority", "一致の優先", "list"),
+        PropSpec("window", tr("対象アプリ", "Application"), "list", running_flag=True),
+        PropSpec("priority", tr("一致の優先", "Window match priority"), "list"),
     ],
     "wasapi_input_capture": [
-        PropSpec("device_id", "録音デバイス", "list", running_flag=True),
-        PropSpec("use_device_timing", "デバイスのタイミングを使う", "bool"),
+        PropSpec("device_id", tr("録音デバイス", "Recording device"), "list", running_flag=True),
+        PropSpec("use_device_timing", tr("デバイスのタイミングを使う", "Use device timestamps"), "bool"),
     ],
     "wasapi_output_capture": [
-        PropSpec("device_id", "再生デバイス", "list", running_flag=True),
-        PropSpec("use_device_timing", "デバイスのタイミングを使う", "bool"),
+        PropSpec("device_id", tr("再生デバイス", "Playback device"), "list", running_flag=True),
+        PropSpec("use_device_timing", tr("デバイスのタイミングを使う", "Use device timestamps"), "bool"),
     ],
     # 映像キャプチャデバイス（ウェブカメラ・キャプチャーボード）。
     # ★有効・無効(active)はここに載せない。設定として書いても
@@ -134,52 +136,52 @@ PROP_TABLE: dict[str, list[PropSpec]] = {
     #   切り替えは専用のボタン操作でしか行わない＝誤って「設定で止めた
     #   つもり」を作らないよう、構造的に選べないようにしてある。
     CAMERA_KIND: [
-        PropSpec("video_device_id", "カメラ", "list", running_flag=True),
-        PropSpec("buffering", "バッファリング", "bool"),
-        PropSpec("deactivate_when_not_showing", "映していないときは止める",
+        PropSpec("video_device_id", tr("カメラ", "Camera"), "list", running_flag=True),
+        PropSpec("buffering", tr("バッファリング", "Buffering"), "bool"),
+        PropSpec("deactivate_when_not_showing", tr("映していないときは止める", "Deactivate when not showing"),
                  "bool"),
     ],
     MEDIA_KIND: [
-        PropSpec("local_file", "音楽ファイル", "file"),
-        PropSpec("looping", "繰り返し再生", "bool"),
-        PropSpec("restart_on_activate", "シーン切り替えで最初から", "bool"),
-        PropSpec("clear_on_media_end", "再生が終わったら消す", "bool"),
-        PropSpec("speed_percent", "再生速度", "int",
-                 min_value=1, max_value=200, unit="パーセント"),
+        PropSpec("local_file", tr("音楽ファイル", "Music file"), "file"),
+        PropSpec("looping", tr("繰り返し再生", "Loop"), "bool"),
+        PropSpec("restart_on_activate", tr("シーン切り替えで最初から", "Restart playback when source becomes active"), "bool"),
+        PropSpec("clear_on_media_end", tr("再生が終わったら消す", "Hide source when playback ends"), "bool"),
+        PropSpec("speed_percent", tr("再生速度", "Speed"), "int",
+                 min_value=1, max_value=200, unit=tr("パーセント", " percent")),
     ],
     # ここから下は 0.12.0 でソースを作れるようにしたときに足した種別。
     # ★キーはすべて実機で「投げて読み戻せる」ことを確認済み。
     #   既定設定に現れないキー（image_source の file、text の text）が
     #   あるので、既定を見るだけでは足りない。
     WINDOW_CAPTURE_KIND: [
-        PropSpec("window", "対象ウィンドウ", "list", running_flag=True),
-        PropSpec("cursor", "マウスカーソルを含める", "bool"),
-        PropSpec("client_area", "枠を除いて取り込む", "bool"),
+        PropSpec("window", tr("対象ウィンドウ", "Window"), "list", running_flag=True),
+        PropSpec("cursor", tr("マウスカーソルを含める", "Capture cursor"), "bool"),
+        PropSpec("client_area", tr("枠を除いて取り込む", "Client area only"), "bool"),
     ],
     MONITOR_CAPTURE_KIND: [
-        PropSpec("monitor_id", "モニター", "list", running_flag=True),
-        PropSpec("capture_cursor", "マウスカーソルを含める", "bool"),
+        PropSpec("monitor_id", tr("モニター", "Display"), "list", running_flag=True),
+        PropSpec("capture_cursor", tr("マウスカーソルを含める", "Capture cursor"), "bool"),
     ],
     IMAGE_KIND: [
-        PropSpec("file", "画像ファイル", "file", file_kind="image"),
-        PropSpec("unload", "映していないときは読み込まない", "bool"),
+        PropSpec("file", tr("画像ファイル", "Image file"), "file", file_kind="image"),
+        PropSpec("unload", tr("映していないときは読み込まない", "Unload image when not showing"), "bool"),
     ],
     TEXT_KIND: [
-        PropSpec("text", "文字", "text"),
+        PropSpec("text", tr("文字", "Text"), "text"),
     ],
     BROWSER_KIND: [
-        PropSpec("url", "アドレス", "text"),
-        PropSpec("width", "幅", "int",
-                 min_value=1, max_value=7680, unit="ピクセル"),
-        PropSpec("height", "高さ", "int",
-                 min_value=1, max_value=4320, unit="ピクセル"),
+        PropSpec("url", tr("アドレス", "URL"), "text"),
+        PropSpec("width", tr("幅", "Width"), "int",
+                 min_value=1, max_value=7680, unit=tr("ピクセル", " pixels")),
+        PropSpec("height", tr("高さ", "Height"), "int",
+                 min_value=1, max_value=4320, unit=tr("ピクセル", " pixels")),
     ],
     COLOR_KIND: [
-        PropSpec("color", "色", "choice", choices=COLOR_CHOICES),
-        PropSpec("width", "幅", "int",
-                 min_value=1, max_value=7680, unit="ピクセル"),
-        PropSpec("height", "高さ", "int",
-                 min_value=1, max_value=4320, unit="ピクセル"),
+        PropSpec("color", tr("色", "Color"), "choice", choices=COLOR_CHOICES),
+        PropSpec("width", tr("幅", "Width"), "int",
+                 min_value=1, max_value=7680, unit=tr("ピクセル", " pixels")),
+        PropSpec("height", tr("高さ", "Height"), "int",
+                 min_value=1, max_value=4320, unit=tr("ピクセル", " pixels")),
     ],
 }
 
@@ -188,23 +190,23 @@ PROP_TABLE: dict[str, list[PropSpec]] = {
 # 一覧の行は「ラベル、値」の形なので、値に読点が入ると区切りが分からなくなる。
 # ★キーは itemValue（並び順ではない）
 PRIORITY_JP = {
-    PRIORITY_TITLE: "タイトルが一致",
-    PRIORITY_CLASS: "種類が一致",
-    PRIORITY_EXE: "実行ファイルが一致",
+    PRIORITY_TITLE: tr("タイトルが一致", "Match title"),
+    PRIORITY_CLASS: tr("種類が一致", "Match type"),
+    PRIORITY_EXE: tr("実行ファイルが一致", "Match executable"),
 }
 CAPTURE_MODE_JP = {
-    "any_fullscreen": "全画面のゲーム",
-    "window": "特定のウィンドウ",
-    "hotkey": "ホットキーで前面",
+    "any_fullscreen": tr("全画面のゲーム", "Any fullscreen application"),
+    "window": tr("特定のウィンドウ", "Specific window"),
+    "hotkey": tr("ホットキーで前面", "Foreground window by hotkey"),
 }
 
 
-MONITOR_SPEC = PropSpec(MONITOR_KEY, "音声モニタリング", "monitor")
+MONITOR_SPEC = PropSpec(MONITOR_KEY, tr("音声モニタリング", "Audio monitoring"), "monitor")
 
 
 def monitor_label(mon_type: str) -> str:
     """モニタリング設定を読み上げ用の日本語にする。"""
-    return MONITOR_JP.get(mon_type, "不明")
+    return MONITOR_JP.get(mon_type, tr("不明", "unknown"))
 
 
 def specs_for_kind(kind: str) -> list[PropSpec]:
@@ -414,7 +416,7 @@ def format_value(
 ) -> str:
     """項目1つの現在値を読み上げ用の文字列にする。"""
     if spec.type == "bool":
-        return "オン" if bool(raw) else "オフ"
+        return tr("オン", "on") if bool(raw) else tr("オフ", "off")
     if spec.type == "int":
         try:
             return f"{int(raw)}{spec.unit}"
@@ -422,16 +424,16 @@ def format_value(
             return f"{raw}{spec.unit}"
     if spec.type == "file":
         stem = file_stem(str(raw or ""))
-        return stem if stem else "未設定"
+        return stem if stem else tr("未設定", "not set")
     if spec.type == "choice":
-        return choice_label(spec, raw) if raw is not None else "未設定"
+        return choice_label(spec, raw) if raw is not None else tr("未設定", "not set")
     if spec.type == "text":
         # 長い本文をそのまま読むと聞き終わらないので、頭だけ読む。
         # 全文は OBS 側か、変更時の読み上げで確かめられる
         text = " ".join(str(raw or "").split())
         if not text:
-            return "未設定"
-        return text if len(text) <= 30 else text[:30] + " 以下略"
+            return tr("未設定", "not set")
+        return text if len(text) <= 30 else text[:30] + tr(" 以下略", " and so on")
     if raw is None or raw == "":
-        return "未設定"
+        return tr("未設定", "not set")
     return value_label(kind, spec.key, raw, item_label)

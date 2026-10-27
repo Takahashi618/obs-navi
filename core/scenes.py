@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .i18n import tr
+
 # OBSがトランジションの長さとして受け付ける範囲（obs-websocket の仕様）
 DURATION_MIN_MS = 50
 DURATION_MAX_MS = 20000
@@ -145,10 +147,11 @@ def can_remove(scenes, name: str) -> tuple[bool, str]:
     """
     names = [s for s in (scenes or []) if s]
     if name not in names:
-        return (False, "そのシーンが見つかりません")
+        return (False, tr("そのシーンが見つかりません", "That scene was not found"))
     if len(names) <= 1:
-        return (False, "最後のシーンは削除できません。"
-                       "先に別のシーンを作ってください")
+        return (False, tr("最後のシーンは削除できません。"
+                          "先に別のシーンを作ってください",
+           "The last scene cannot be deleted. Create another scene first"))
     return (True, "")
 
 

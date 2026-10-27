@@ -11,6 +11,9 @@ import sys
 
 # 読み上げを無効化してからテスト対象を import する
 os.environ["OBSNAVI_SILENT"] = "1"
+# テストは日本語に固定する（PC の表示言語で結果が変わらないように）。
+# 英語の表示は tests/en_probe.py が別のプロセスで調べる
+os.environ["OBSNAVI_LANG"] = "ja"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -19,6 +22,7 @@ sys.path.insert(0, HERE)
 import test_commands  # noqa: E402
 import test_config  # noqa: E402
 import test_hotkeys  # noqa: E402
+import test_i18n  # noqa: E402
 import test_keymap  # noqa: E402
 import test_levels  # noqa: E402
 import test_ordering  # noqa: E402
@@ -54,6 +58,7 @@ MODULES = [
     ("scenes", test_scenes),
     ("keymap", test_keymap),
     ("tracks", test_tracks),
+    ("i18n", test_i18n),
 ]
 
 

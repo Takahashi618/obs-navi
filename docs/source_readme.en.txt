@@ -1,0 +1,67 @@
+OBS Navi {VERSION} source code
+
+This folder contains the source code used to build the included program file (OBSNavi.exe).
+It was taken from git commit {COMMIT}.
+You do not need this folder just to use OBS Navi.
+
+
+== Copyright and license
+
+Copyright (C) 2026 Takahashi
+
+OBS Navi is distributed under the GNU General Public License version 3 (GPL version 3).
+The full text is in LICENSE.txt in this folder.
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, version 3 of the License.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+for more details.
+
+
+== What is in this folder
+
+- About the source code (English).txt is this file, and About the source code (Japanese).txt is the Japanese version.
+- README.md and README.en.md introduce OBS Navi and explain how to run it from source (Japanese and English).
+- app.py is the entry point.
+- version.py holds the version number.
+- speech.py sends speech to the screen reader.
+- The core folder handles communication with OBS and the processing that does not depend on the window. The keys are defined in core\keymap.py. The display language is decided in core\i18n.py.
+- The ui folder is the window (wxPython).
+- The tests folder holds the tests.
+- The tools folder generates and checks the documents and builds the release package.
+- The docs folder holds the source HTML of the manual and the testing guide (manual.en.html and tester.en.html are the English versions).
+- obs_navi.spec is the build setting for the program file (PyInstaller).
+
+
+== Running from source
+
+The author tested with Windows 11 and Python {PYTHON_VERSION} (64-bit).
+The components used and the versions tested are:
+
+{REQUIREMENTS}
+
+1. Install the components.
+   {PIP_INSTALL}
+2. Start OBS Navi.
+   python -X utf8 app.py
+3. Run the tests (OBS is not needed).
+   python -X utf8 tests\run_tests.py
+   To check the English display, also run: python -X utf8 tests\en_probe.py
+
+
+== Building the program file
+
+1. Install PyInstaller.
+   python -m pip install {PYINSTALLER_PIN}
+2. Exit OBS Navi, then run the following (if it is running, the build may be missing the DLLs used for speech).
+   python -X utf8 -m PyInstaller --noconfirm obs_navi.spec
+3. dist\OBSNavi\OBSNavi.exe is created.
+
+The release zip is built with python -X utf8 tools\build_release.py.
+
+
+That is all.

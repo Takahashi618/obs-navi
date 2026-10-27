@@ -7,6 +7,8 @@ UI層（main_frame）で行い、このモジュールは wx に依存しない�
 """
 from __future__ import annotations
 
+from .i18n import tr
+
 # 別名を正規トークンへ寄せる
 _MODIFIER_ALIASES = {
     "ctrl": "ctrl",
@@ -100,13 +102,13 @@ def win32_hotkey_args(tokens: list[str], key_name: str) -> tuple[int, int]:
     mods = WIN32_MOD_NOREPEAT
     for token in tokens:
         if token not in _WIN32_MODIFIER:
-            raise ValueError(f"使えない修飾キーです: {token!r}")
+            raise ValueError(tr(f"使えない修飾キーです: {token!r}", f"Unsupported modifier key: {token!r}"))
         mods |= _WIN32_MODIFIER[token]
     name = str(key_name or "").strip().upper()
     number = name[1:]
     if not (name.startswith("F") and number.isascii() and number.isdigit()
             and 1 <= int(number) <= 12):
-        raise ValueError(f"使えないキー名です: {key_name!r}")
+        raise ValueError(tr(f"使えないキー名です: {key_name!r}", f"Unsupported key name: {key_name!r}"))
     return mods, _WIN32_VK_F1 + int(number) - 1
 
 

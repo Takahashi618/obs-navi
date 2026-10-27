@@ -5,6 +5,11 @@
     python -X utf8 tools/doc_parts.py --check   合わせる必要があるかだけ調べる
                                                 （あれば 1 で終わる。書き換えない）
 
+日本語の文書（manual.html・tester.html）と英語の文書（manual.en.html・
+tester.en.html）の両方を合わせる。★画面の言語は起動したときに1回だけ
+決まる（core/i18n.py）ので、英語の分は別のプロセスで、英語の画面から作る
+（--lang en。update_docs が自分で呼ぶ）。
+
 キー・メニュー・作れるソースの種類・フィルターの種類・設定の既定値は、
 手で書き写すと必ずずれる（キーの一覧だけが 0.13.0 のまま
 取り残されたことがある）。そこで、実際の
@@ -32,20 +37,30 @@ import html
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-# 版の番号だけを合わせる文書と、印の節まで作り直す文書
-MANUAL = DOCS / "manual.html"
-TESTER = DOCS / "tester.html"
+# 言語ごとの文書
+DOC_FILES = {
+    "ja": (DOCS / "manual.html", DOCS / "tester.html"),
+    "en": (DOCS / "manual.en.html", DOCS / "tester.en.html"),
+}
 
 # ★speech は読み込んだ時点で無音かどうかを決めるので、import より先に置く
 os.environ["OBSNAVI_SILENT"] = "1"
+# ★言語も import より先に決める（メニューやキーの表は import のときに
+#   作られる）。--lang が無ければ日本語（build_release.py から import した
+#   ときもこちら）
+LANG = (sys.argv[sys.argv.index("--lang") + 1]
+        if "--lang" in sys.argv[:-1] else "ja")
+os.environ["OBSNAVI_LANG"] = LANG
 sys.path.insert(0, str(ROOT))
 
 from core import filters, keymap, sources  # noqa: E402
+from core.i18n import tr  # noqa: E402
 from core.config import Config  # noqa: E402
 from version import VERSION  # noqa: E402
 
@@ -56,8 +71,17 @@ VERSION_SPAN_RE = re.compile(r'(<span class="version">)[^<]*(</span>)')
 TITLE_RE = re.compile(r"(<title>[^<]*?)\d+\.\d+\.\d+([^<]*</title>)")
 
 
+# 英語の画面にもわざと日本語で出しているもの。英語の文書では lang="ja" を
+# 付けて、読み上げが日本語の声に切り替えられるようにする
+JA_IN_EN = ("表示の言語",)
+
+
 def esc(text) -> str:
-    return html.escape(str(text), quote=False)
+    out = html.escape(str(text), quote=False)
+    if LANG == "en":
+        for word in JA_IN_EN:
+            out = out.replace(word, f'<span lang="ja">{word}</span>')
+    return out
 
 
 def sandbox_config() -> Config:
@@ -115,17 +139,21 @@ def read_menus() -> tuple[list[dict], list[dict]]:
         menus = []
         for i in range(bar.GetMenuCount()):
             title = bar.GetMenuLabel(i)
-            m = re.search(r"\(&(\w)\)", title)
+            # 日本語は「配信・録画(&S)」、英語は「&Stream and Record」や
+            # 「Camera (&K)」の形
+            m = re.search(r"&(\w)", title)
             menus.append({
-                "title": re.sub(r"\(&\w\)", "", title),
-                "mnemonic": m.group(1) if m else "",
+                "title": re.sub(r"\s*\(&\w\)", "", title).replace("&", ""),
+                "mnemonic": m.group(1).upper() if m else "",
                 "items": _menu_items(bar.GetMenu(i)),
             })
         popups = []
-        for name, lst in (("シーン一覧", frame.scene_list),
-                          ("ソース一覧", frame.item_list),
-                          ("音声入力一覧", frame.input_list),
-                          ("フィルター一覧", frame.filter_list)):
+        for name, lst in ((tr("シーン一覧", "Scene list"), frame.scene_list),
+                          (tr("ソース一覧", "Source list"), frame.item_list),
+                          (tr("音声入力一覧", "Audio input list"),
+                           frame.input_list),
+                          (tr("フィルター一覧", "Filter list"),
+                           frame.filter_list)):
             menu = frame.build_list_menu(lst)
             popups.append({"list": name, "items": _menu_items(menu)})
             menu.Destroy()
@@ -141,12 +169,19 @@ def _table(caption: str, head: tuple, rows: list[tuple]) -> str:
     ★caption は使わない。txt にすると表の行のあとに出てしまい、
     何の表かを知らないまま行を聞かされる。
     """
-    quoted = [f"「{h}」" for h in head]
-    cols = ("と".join(quoted) if len(quoted) == 2
-            else "、".join(quoted))
-    lines = [f"<p>{esc(caption)}表は{len(rows)}行で、列は{cols}の"
-             f"{len(head)}つです。</p>",
-             "<table>", "<thead><tr>"]
+    if LANG == "en":
+        quoted = [f"\"{h}\"" for h in head]
+        cols = (" and ".join(quoted) if len(quoted) == 2
+                else ", ".join(quoted[:-1]) + ", and " + quoted[-1])
+        intro = (f"<p>{esc(caption)} The table has {len(rows)} rows and "
+                 f"{len(head)} columns: {cols}.</p>")
+    else:
+        quoted = [f"「{h}」" for h in head]
+        cols = ("と".join(quoted) if len(quoted) == 2
+                else "、".join(quoted))
+        intro = (f"<p>{esc(caption)}表は{len(rows)}行で、列は{cols}の"
+                 f"{len(head)}つです。</p>")
+    lines = [intro, "<table>", "<thead><tr>"]
     lines += [f'<th scope="col">{esc(h)}</th>' for h in head]
     lines += ["</tr></thead>", "<tbody>"]
     for row in rows:
@@ -164,11 +199,15 @@ def part_keys(cfg: Config) -> str:
             if r.scope != keymap.SCOPE_WINDOW]
     return "\n".join([
         f"<h3>{esc(keymap.SCOPE_LABEL[keymap.SCOPE_WINDOW])}</h3>",
-        _table("OBSナビの画面にいるときだけ効くキーです。",
-               ("キー", "動作"), window),
+        _table(tr("OBSナビの画面にいるときだけ効くキーです。",
+                  "These keys work only while you are in the OBS Navi "
+                  "window."),
+               (tr("キー", "Key"), tr("動作", "Action")), window),
         f"<h3>{esc(keymap.SCOPE_LABEL[keymap.SCOPE_GLOBAL])}</h3>",
-        _table("ゲームやほかのアプリを使っている間も効くキーです。",
-               ("キー", "動作"), glob),
+        _table(tr("ゲームやほかのアプリを使っている間も効くキーです。",
+                  "These keys work even while you are using a game or "
+                  "another app."),
+               (tr("キー", "Key"), tr("動作", "Action")), glob),
     ])
 
 
@@ -178,20 +217,37 @@ def _item_text(item: dict) -> str:
     if item["accel"]:
         notes.append(item["accel"])
     if item["check"]:
-        notes.append("チェック項目。選ぶたびにオンとオフが切り替わります")
+        notes.append(tr("チェック項目。選ぶたびにオンとオフが切り替わります",
+                        "a check item that turns on or off each time you "
+                        "choose it"))
+    if LANG == "en":
+        return f"{text} ({'; '.join(notes)})" if notes else text
     return f"{text}（{'。'.join(notes)}）" if notes else text
 
 
 def part_menus(menus: list[dict]) -> str:
-    names = "、".join(m["title"] for m in menus)
-    lines = [f"<p>メニューは{len(menus)}つで、左から順に{esc(names)}です。"
-             "項目の後ろのかっこの中は、その項目のキーです。</p>"]
+    if LANG == "en":
+        names = ", ".join(m["title"] for m in menus)
+        lines = [f"<p>There are {len(menus)} menus. From left to right: "
+                 f"{esc(names)}. The text in parentheses after an item is "
+                 "its key.</p>"]
+    else:
+        names = "、".join(m["title"] for m in menus)
+        lines = [f"<p>メニューは{len(menus)}つで、左から順に{esc(names)}です。"
+                 "項目の後ろのかっこの中は、その項目のキーです。</p>"]
     for m in menus:
-        head = f"{m['title']}メニュー"
-        if m["mnemonic"]:
-            head += f"（Alt+{m['mnemonic']} で直接開けます）"
+        if LANG == "en":
+            head = f"{m['title']} menu"
+            if m["mnemonic"]:
+                head += f" (Alt+{m['mnemonic']} opens it directly)"
+            count = f"{len(m['items'])} items."
+        else:
+            head = f"{m['title']}メニュー"
+            if m["mnemonic"]:
+                head += f"（Alt+{m['mnemonic']} で直接開けます）"
+            count = f"{len(m['items'])}項目です。"
         lines.append(f"<h3>{esc(head)}</h3>")
-        lines.append(f"<p>{len(m['items'])}項目です。</p>")
+        lines.append(f"<p>{count}</p>")
         lines.append("<ul>")
         lines += [f"<li>{esc(_item_text(it))}</li>" for it in m["items"]]
         lines.append("</ul>")
@@ -201,6 +257,12 @@ def part_menus(menus: list[dict]) -> str:
 def part_popups(popups: list[dict]) -> str:
     lines = ["<ul>"]
     for p in popups:
+        if LANG == "en":
+            labels = ", ".join(it["label"] for it in p["items"])
+            lines.append(
+                f"<li>In the {esc(p['list'].lower())}: {esc(labels)} "
+                f"({len(p['items'])} items)</li>")
+            continue
         labels = "、".join(it["label"] for it in p["items"])
         lines.append(
             f"<li>{esc(p['list'])}では、{esc(labels)}"
@@ -211,15 +273,21 @@ def part_popups(popups: list[dict]) -> str:
 
 def part_source_kinds() -> str:
     rows = [(k.label, k.hint) for k in sources.CREATABLE_KINDS]
-    return _table("作れるソースの種類です。上から、選ぶ画面に並ぶ順です。",
-                  ("種類", "何のためのものか"), rows)
+    return _table(tr("作れるソースの種類です。上から、選ぶ画面に並ぶ順です。",
+                     "The kinds of sources you can create, in the order "
+                     "they appear in the list."),
+                  (tr("種類", "Kind"), tr("何のためのものか", "What it is for")),
+                  rows)
 
 
 def part_filter_kinds() -> str:
     rows = [(k.label, k.hint) for k in filters.AUDIO_FILTER_KINDS]
-    return _table("追加できる音声フィルターの種類です。上から、選ぶ画面に"
-                  "並ぶ順です。",
-                  ("種類", "何のためのものか"), rows)
+    return _table(tr("追加できる音声フィルターの種類です。上から、選ぶ画面に"
+                     "並ぶ順です。",
+                     "The kinds of audio filters you can add, in the order "
+                     "they appear in the list."),
+                  (tr("種類", "Kind"), tr("何のためのものか", "What it is for")),
+                  rows)
 
 
 def _dig(cfg: Config, dotted: str):
@@ -230,13 +298,22 @@ def _dig(cfg: Config, dotted: str):
 
 
 def _sr_value(value) -> str:
+    if LANG == "en":
+        return ", ".join(f"{s['name']} (key {s.get('key', 'none')})"
+                         for s in value)
     return "、".join(f"{s['name']}（キー {s.get('key', 'なし')}）"
                      for s in value)
 
 
 # 設定ファイルの主な項目。既定値は Config() から引く（書き写さない）。
 # ★項目の名前を変えたら、ここが KeyError で止まって気づける
+# ★意味は (日本語, 英語) で並べる（CONFIG_DOCS_EN）。英語の文書を作る
+#   プロセスでは英語のほうを使う
 CONFIG_DOCS = (
+    ("language", "表示と読み上げの言語。\"auto\" は PC の表示言語に合わせ"
+     "（日本語なら日本語、それ以外は英語）、\"ja\" は日本語、\"en\" は"
+     "英語。「ツール」メニューの「表示の言語」でも選べます。次に起動した"
+     "ときから効きます"),
     ("auto_password", "true なら、接続のポートとパスワードを OBS の設定"
      "ファイルから読みます。ふつうは変えません"),
     ("host", "OBS が動いているパソコン。同じパソコンなら変えません"),
@@ -276,21 +353,82 @@ CONFIG_DOCS = (
     ("camera.confirm_before_toggle", "カメラを切り替える前に確認を出すか"),
 )
 
+CONFIG_DOCS_EN = {
+    "language": "The display and speech language. \"auto\" follows the "
+    "Windows display language (Japanese if it is Japanese, otherwise "
+    "English), \"ja\" is Japanese, and \"en\" is English. You can also "
+    "choose it with Language in the Tools menu. It takes effect the next "
+    "time you start OBS Navi",
+    "auto_password": "If true, the port and password for the connection are "
+    "read from the OBS settings file. Usually left as is",
+    "host": "The computer where OBS is running. Leave it as is if it is the "
+    "same computer",
+    "global_hotkeys_enabled": "Whether to use the keys that work anywhere. "
+    "If false, they are not registered",
+    "global_hotkey_modifier": "The modifier keys for the keys that work "
+    "anywhere. Join Ctrl, Alt, Shift, and Win with +. The stronger level adds "
+    "one more key to this (Alt if Alt is not included, otherwise Shift)",
+    "sr_sources": "The inputs that send screen reader voices to the stream. "
+    "Each has a name, a method, and a key (F1 to F12)",
+    "silence_seconds": "While streaming or recording, you are notified if "
+    "silence continues for this many seconds",
+    "silence_threshold_db": "Sound quieter than this is treated as silence "
+    "(decibels)",
+    "clip_threshold_db": "You are notified of clipping when the sound reaches "
+    "this level (decibels)",
+    "monitor_enabled": "Whether to warn about silence and clipping",
+    "level_hold_seconds": "The level read with F6 is the maximum over this "
+    "many recent seconds. With 0, the value at the moment you press is read",
+    "volume_step_db": "How much Left and Right Arrow change the volume "
+    "(decibels)",
+    "volume_coarse_step_db": "How much Shift+Left and Right Arrow change the "
+    "volume (decibels)",
+    "game_switch.video_source": "The name of the video source used by Game "
+    "switch. If it is not found, you can choose again from the game capture "
+    "sources",
+    "game_switch.audio_sources": "The names of the Application Audio sources "
+    "switched together with Game switch",
+    "bgm.source_name": "The name of the media source used for BGM",
+    "record.pause_reminder_seconds": "While recording stays paused, you are "
+    "reminded every this many seconds. 0 turns the reminder off",
+    "record.disk_warn_mb": "While recording, you are warned when free space "
+    "falls below this (megabytes). 0 turns it off",
+    "record.disk_critical_mb": "Free space for the stronger warning "
+    "(megabytes)",
+    "record.announce_file_name": "Whether to read the file name when you stop "
+    "recording or save a replay",
+    "record.pause_hotkey": "The key that works anywhere for pausing and "
+    "resuming recording (stronger level). Empty means no key",
+    "record.chapter_hotkey": "The key that works anywhere for adding a "
+    "chapter (stronger level)",
+    "camera.hotkey": "The key that works anywhere for enabling or disabling "
+    "the camera (stronger level)",
+    "camera.confirm_before_toggle": "Whether to ask before switching the "
+    "camera",
+}
+
 
 def part_config(cfg: Config) -> str:
     rows = []
     for dotted, meaning in CONFIG_DOCS:
+        if LANG == "en":
+            meaning = CONFIG_DOCS_EN[dotted]
         value = _dig(cfg, dotted)
         if dotted == "sr_sources":
             shown = _sr_value(value)
         else:
             shown = json.dumps(value, ensure_ascii=False)
         rows.append((dotted, shown, meaning))
-    return _table("設定ファイルの主な項目です。項目の名前のうち、点で"
-                  "区切ってあるものは「点の前の項目の中にある」という"
-                  "意味です（例えば record.disk_warn_mb は record の中の "
-                  "disk_warn_mb）。",
-                  ("項目", "既定値", "意味"), rows)
+    return _table(tr("設定ファイルの主な項目です。項目の名前のうち、点で"
+                     "区切ってあるものは「点の前の項目の中にある」という"
+                     "意味です（例えば record.disk_warn_mb は record の中の "
+                     "disk_warn_mb）。",
+                     "The main items in the settings file. A name with a dot "
+                     "means the item is inside the item before the dot "
+                     "(for example, record.disk_warn_mb is disk_warn_mb "
+                     "inside record)."),
+                  (tr("項目", "Item"), tr("既定値", "Default"),
+                   tr("意味", "Meaning")), rows)
 
 
 def build_parts(with_menus: bool = True) -> dict[str, str]:
@@ -333,10 +471,33 @@ def apply_parts(text: str, parts: dict[str, str]) -> str:
 
 
 def update_docs(check_only: bool = False) -> list[Path]:
-    """docs の文書を合わせる。変わった（変わるべき）文書を返す。"""
+    """docs の文書を合わせる。変わった（変わるべき）文書を返す。
+
+    この言語（LANG）の文書を合わせたあと、日本語のプロセスなら英語の
+    文書を別のプロセスで合わせる。
+    """
+    changed = _update_own_docs(check_only)
+    if LANG == "ja":
+        args = [sys.executable, "-X", "utf8", str(Path(__file__).resolve()),
+                "--lang", "en", "--list"]
+        if check_only:
+            args.append("--check")
+        result = subprocess.run(args, capture_output=True, text=True,
+                                encoding="utf-8")
+        if result.returncode not in (0, 1):
+            raise RuntimeError("英語の文書を作れませんでした: "
+                               + (result.stderr or result.stdout)[-800:])
+        changed += [Path(line[len("CHANGED "):])
+                    for line in result.stdout.splitlines()
+                    if line.startswith("CHANGED ")]
+    return changed
+
+
+def _update_own_docs(check_only: bool) -> list[Path]:
+    """この言語（LANG）の文書だけを合わせる。"""
     parts = build_parts()
     changed = []
-    for path in (MANUAL, TESTER):
+    for path in DOC_FILES[LANG]:
         raw = path.read_bytes()
         # ★元の改行を保つ（git は autocrlf で作業ツリーが CRLF。LF で
         #   書き戻すと、中身が同じでも変更ありに見える）
@@ -352,6 +513,12 @@ def update_docs(check_only: bool = False) -> list[Path]:
 
 def main(argv: list[str]) -> int:
     check_only = "--check" in argv
+    if "--list" in argv:
+        # update_docs から呼ばれたとき。この言語の分だけ合わせ、
+        # 変わった文書を1行ずつ返す
+        for path in _update_own_docs(check_only):
+            print(f"CHANGED {path}")
+        return 0
     changed = update_docs(check_only=check_only)
     for path in changed:
         verb = "作り直しが必要" if check_only else "作り直しました"

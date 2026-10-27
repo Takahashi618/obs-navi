@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OBSナビ 0.19.0 マニュアル</title>
+<title>OBSナビ 0.20.1 マニュアル</title>
 <style>
 :root { color-scheme: light dark; }
 body {
@@ -24,7 +24,7 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 </style>
 </head>
 <body>
-<h1>OBSナビ <span class="version">0.19.0</span> マニュアル</h1>
+<h1>OBSナビ <span class="version">0.20.1</span> マニュアル</h1>
 
 <p>作者: Takahashi。この文書は 2026年9月26日 に書きました。</p>
 <p>OBSナビは、スクリーンリーダー（PC-Talker・NVDA）で OBS Studio を操作するための道具です。この文書は、見出しで移動しながら読めるように、章ごとに見出しを付けてあります。</p>
@@ -70,6 +70,7 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <li>スクリーンリーダーの声を配信に乗せる・乗せないの切り替え</li>
 <li>配信中・録画中の、無音と音割れの警告。録画中の空き容量の警告</li>
 <li>ゲーム中でも効くキー</li>
+<li>日本語と英語の表示（Windows の表示言語に合わせて自動で選び、メニューから変えられます）</li>
 </ul>
 
 <h3>できないこと</h3>
@@ -84,6 +85,12 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <h3>AI を使って作ったこと</h3>
 <p>OBSナビのプログラムとこの文書は、AI（Anthropic の Claude）を使って書きました。何を作るか、どう動くべきか、読み上げで使いやすいかは、作者が決めています。作者自身がスクリーンリーダーで使い、確かめながら直してきました。あわせて、自動のテストで動作を確かめています。</p>
 <p>「ヘルプ」メニューの「OBSナビについて」でも、このことを読み上げます。</p>
+
+<h3 id="language">表示の言語</h3>
+<p>OBSナビは、画面と読み上げを日本語か英語で出します。最初は Windows の表示言語に合わせ、日本語なら日本語、それ以外なら英語にします。</p>
+<p>変えるときは、「ツール」メニューの「表示の言語 (Language)」を選びます。この項目は、どちらの言語になっていても見つけられるよう、日本語と英語を併記してあります。「自動」「日本語」「English」から選ぶと、今すぐ再起動するかを聞きます。「はい」で、選んだ言語で起動し直します。「いいえ」なら、次に起動したときから変わります。</p>
+<p>OBS で付けた名前（シーンやソースの名前）は訳しません。OBSナビが最初に用意するソースの名前（「ゲームキャプチャ」「BGM音楽」など）は、設定ファイルを初めて作ったときの言語で決まります。</p>
+<p>英語のマニュアルは、同じフォルダの「Manual (English).html」と「Manual (English).txt」です。</p>
 
 <h2 id="requirements">2. 動作環境</h2>
 <ul>
@@ -123,14 +130,15 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <li>zip ファイルを選んでアプリケーションキーを押し、「すべて展開」で展開します。</li>
 <li>展開したフォルダを、「ドキュメント」など自分が書き込めるフォルダに置きます。</li>
 </ol>
+<p>配布物のファイル名とフォルダ名は、文字化けしないようにすべて英字にしてあります。本体は OBSNavi.exe、このマニュアルは「Manual (Japanese)」です。日本語の書類は名前の最後に (Japanese)、英語の書類は (English) が付いています。</p>
 <p>「Program Files」の中などには置かないでください。OBSナビは、自分と同じフォルダに設定ファイル（obs_navi_config.json）を作ります。書き込めない場所では設定が保存されません。</p>
 <p>展開する前に zip ファイルの「プロパティ」（Alt+Enter）を開き、「全般」タブの「許可する」のチェックボックスをオンにしておくと、次の節の Windows の警告が出なくなります。</p>
 
 <h3 id="setup-start">3.3 起動する</h3>
 <ol>
 <li>OBS Studio を起動しておきます。</li>
-<li>OBSナビのフォルダにある OBSナビ.exe を起動します。</li>
-<li>最初に「OBSナビ バージョン <span class="version">0.19.0</span> の状態」と読みます。これが起動した OBSナビの版です。</li>
+<li>OBSナビのフォルダにある OBSNavi.exe を起動します。</li>
+<li>最初に「OBSナビ バージョン <span class="version">0.20.1</span> の状態」と読みます。これが起動した OBSナビの版です。</li>
 <li>続けて「OBSに接続しました。配信停止中、録画停止中、現在のシーン …」のように読めば準備完了です。</li>
 </ol>
 <p>「Windows によって PC が保護されました」という画面が出たときは、Tab キーで「詳細情報」へ移って Enter を押し、さらに Tab キーで「実行」ボタンへ移って Enter を押します。電子署名の無いアプリなので出る画面で、この配布物に問題があるという意味ではありません。</p>
@@ -144,7 +152,7 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <h2 id="screen">4. 画面の構成</h2>
 <p>OBSナビの画面には欄が6つあり、Tab キーで上から順に回ります（Shift+Tab で逆に回ります）。起動したときは1つ目の状態の欄にいます。</p>
 <ol>
-<li><strong>状態</strong>（読み取り専用の欄）。名前は「OBSナビ バージョン <span class="version">0.19.0</span> の状態」です。配信・録画の状態と今のシーン、接続できなかったときはその理由が入ります。</li>
+<li><strong>状態</strong>（読み取り専用の欄）。名前は「OBSナビ バージョン <span class="version">0.20.1</span> の状態」です。配信・録画の状態と今のシーン、接続できなかったときはその理由が入ります。</li>
 <li><strong>配信・録画</strong>（リスト、4項目）。配信を開始、配信を停止、録画を開始、録画を停止の4つです。上下矢印で選んで Enter で実行します。項目名にはキーも入っています（「配信を開始 Ctrl+S」）。</li>
 <li><strong>シーン一覧</strong>。Enter で、選んでいるシーンに切り替えます。選ぶだけでは切り替わりません。</li>
 <li><strong>ソース一覧</strong>。シーン一覧で選んでいるシーンの中のソースです。行は「ゲームキャプチャ 表示中」のように、名前と表示の状態を読みます。Enter で表示と非表示を切り替えます。シーン一覧で別のシーンを選べば、配信中の画面を変えずに、そのシーンの中身を確かめられます。</li>
@@ -566,11 +574,12 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <li>ミュート中のソースを読み上げない（チェック項目。選ぶたびにオンとオフが切り替わります）</li>
 </ul>
 <h3>ツールメニュー（Alt+T で直接開けます）</h3>
-<p>3項目です。</p>
+<p>4項目です。</p>
 <ul>
 <li>状態読み上げ（F5）</li>
 <li>統計読み上げ（Ctrl+Alt+F10）</li>
 <li>OBSに再接続</li>
+<li>表示の言語 (Language)</li>
 </ul>
 <h3>ヘルプメニュー（Alt+H で直接開けます）</h3>
 <p>2項目です。</p>
@@ -581,7 +590,7 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <!-- /gen:menus -->
 
 <h2 id="config">14. 設定ファイル</h2>
-<p>設定は、OBSナビ.exe と同じフォルダの obs_navi_config.json に入っています。初めて起動したときに作られます。並び順や BGM のソース名など、OBSナビの操作で変えた内容もここに保存されます。</p>
+<p>設定は、OBSNavi.exe と同じフォルダの obs_navi_config.json に入っています。初めて起動したときに作られます。並び順や BGM のソース名など、OBSナビの操作で変えた内容もここに保存されます。</p>
 <ul>
 <li>書き換えるときは、OBSナビを終了してから、メモ帳などで開きます。起動中に書き換えると、OBSナビが上書きすることがあります。</li>
 <li>形が壊れて読めないときは、OBSナビは最初の設定で起動し、そのことを読み上げます。このときは設定を変えても保存されません（壊れたファイルを上書きしないためです）。</li>
@@ -589,7 +598,7 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <li>OBS への接続のパスワードは、このファイルには入れません（OBS の設定ファイルから読みます）。</li>
 </ul>
 <!-- gen:config -->
-<p>設定ファイルの主な項目です。項目の名前のうち、点で区切ってあるものは「点の前の項目の中にある」という意味です（例えば record.disk_warn_mb は record の中の disk_warn_mb）。表は23行で、列は「項目」、「既定値」、「意味」の3つです。</p>
+<p>設定ファイルの主な項目です。項目の名前のうち、点で区切ってあるものは「点の前の項目の中にある」という意味です（例えば record.disk_warn_mb は record の中の disk_warn_mb）。表は24行で、列は「項目」、「既定値」、「意味」の3つです。</p>
 <table>
 <thead><tr>
 <th scope="col">項目</th>
@@ -597,6 +606,7 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <th scope="col">意味</th>
 </tr></thead>
 <tbody>
+<tr><td>language</td><td>"auto"</td><td>表示と読み上げの言語。"auto" は PC の表示言語に合わせ（日本語なら日本語、それ以外は英語）、"ja" は日本語、"en" は英語。「ツール」メニューの「表示の言語」でも選べます。次に起動したときから効きます</td></tr>
 <tr><td>auto_password</td><td>true</td><td>true なら、接続のポートとパスワードを OBS の設定ファイルから読みます。ふつうは変えません</td></tr>
 <tr><td>host</td><td>"localhost"</td><td>OBS が動いているパソコン。同じパソコンなら変えません</td></tr>
 <tr><td>global_hotkeys_enabled</td><td>true</td><td>どこにいても効くキーを使うか。false にすると登録しません</td></tr>
@@ -638,6 +648,8 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <dd>どこにいても効くキーの一部を、ほかのアプリが使っています。そのキーは効きませんが、ほかのキーやメニューは使えます。設定ファイルの global_hotkey_modifier を変えると、まとめて別の修飾キーにできます。</dd>
 <dt>設定が保存されない</dt>
 <dd>書き込めないフォルダに置いている可能性があります。「ドキュメント」などへ移してください（3.2）。</dd>
+<dt>画面と読み上げが英語になっている（日本語にしたい）</dt>
+<dd>「ツール」メニュー（Alt+T）の「表示の言語 (Language)」で「日本語」を選びます（1章の「表示の言語」）。英語になっているときは、メニューの名前は Tools です。</dd>
 <dt>BGM やソースの音が自分に聞こえない。ミュートしたのに聞こえる</dt>
 <dd>モニタリングを確かめてください（9.4）。</dd>
 <dt>チャプターを付けられない</dt>
@@ -661,7 +673,7 @@ code { font-family: Consolas, "BIZ UDGothic", monospace; }
 <h2 id="license">17. ライセンス</h2>
 <p>OBSナビは、GNU General Public License 第3版（GPL 第3版）で配布しています。著作権は作者（Takahashi、2026年）にあります。</p>
 <ul>
-<li>使う・人に配る・改変するのは自由です。配るときは、同じライセンスで、ソースコードも一緒に渡してください。ソースコードは同梱の「ソースコード」フォルダにあります。</li>
+<li>使う・人に配る・改変するのは自由です。配るときは、同じライセンスで、ソースコードも一緒に渡してください。ソースコードは同梱の source フォルダにあります。</li>
 <li>無保証です。OBSナビを使って起きたことについて、作者は責任を負えません。</li>
 <li>ライセンスの全文は同梱の LICENSE.txt（英語）にあります。同梱している部品とそのライセンスは THIRD-PARTY-NOTICES.txt（英語の原文を含む）にあります。</li>
 <li>OBSナビの「ヘルプ」メニューの「OBSナビについて」でも、このライセンスのことを読み上げます。</li>

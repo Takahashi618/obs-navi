@@ -14,6 +14,8 @@ from __future__ import annotations
 import os
 import time
 
+from core.i18n import tr
+
 _SILENT: bool = os.environ.get("OBSNAVI_SILENT", "") == "1"
 _speaker = None
 _speaker_failed = False
@@ -109,7 +111,7 @@ def warn(text: str, interrupt: bool = True) -> None:
     フォーカスした欄の名前（バージョンが入っている）を読んでいる最中に
     割り込むと、そこで切れて版が分からなくなる。
     """
-    speak(f"[警告] {text}", interrupt=interrupt)
+    speak(tr(f"[警告] {text}", f"[Warning] {text}"), interrupt=interrupt)
 
 
 def error(text: str, interrupt: bool = True) -> None:
@@ -117,4 +119,4 @@ def error(text: str, interrupt: bool = True) -> None:
 
     interrupt=False の理由は warn と同じ。
     """
-    speak(f"[エラー] {text}", interrupt=interrupt)
+    speak(tr(f"[エラー] {text}", f"[Error] {text}"), interrupt=interrupt)

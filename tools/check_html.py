@@ -2,23 +2,29 @@
 
     python -X utf8 tools/check_html.py <検査する.html> [...]
 
-検査対象はコマンドラインで受け取る。検査するのは5点。
-  1. html 要素に lang="ja" があり、タグの入れ子が閉じているか
+検査対象はコマンドラインで受け取る。検査するのは5点（英語の文書は6点）。
+  1. html 要素に lang="ja" か lang="en" があり、タグの入れ子が閉じているか
   2. 見出しが h1 → h2 → h3 と飛ばずに下がっているか
      （読み上げは見出しで移動するので、飛ぶと構造が壊れて聞こえる）
   3. ページ内リンク（#で始まる href）の飛び先 id が存在するか
   4. dl の中の dt / dd が対になっているか
   5. 表があるなら見出しセル（th）があるか
+  6. 英語の文書（lang="en"）に日本語の文字が残っていないか。
+     lang="ja" を付けた要素の中（わざと日本語で書いたもの）は除く
 """
 
 from __future__ import annotations
 
+import re
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
 
 VOID = {"meta", "link", "br", "hr", "img", "input", "area", "base", "col",
         "source"}
+
+# かな・漢字・全角の記号と英数字
+JP = re.compile(r"[\u3000-\u30ff\u4e00-\u9fff\uff01-\uff60]")
 
 
 class Collector(HTMLParser):
@@ -31,6 +37,10 @@ class Collector(HTMLParser):
         self.internal_links: list[str] = []
         self.lang: str | None = None
         self.counts: dict[str, int] = {}
+        # lang="ja" の要素の中にいる深さ（その中の文字は日本語でよい）
+        self._ja_depth = 0
+        self._ja_stack: list[bool] = []
+        self.foreign_text: list[str] = []
 
     def handle_starttag(self, tag: str,
                         attrs: list[tuple[str, str | None]]) -> None:
@@ -46,14 +56,22 @@ class Collector(HTMLParser):
             self.headings.append(int(tag[1]))
         if tag not in VOID:
             self.stack.append(tag)
+            is_ja = tag != "html" and (a.get("lang") or "").startswith("ja")
+            self._ja_stack.append(is_ja)
+            self._ja_depth += is_ja
 
     def handle_endtag(self, tag: str) -> None:
         if tag in VOID:
             return
         if self.stack and self.stack[-1] == tag:
             self.stack.pop()
+            self._ja_depth -= self._ja_stack.pop()
         else:
             self.unbalanced.append(tag)
+
+    def handle_data(self, data: str) -> None:
+        if not self._ja_depth and JP.search(data):
+            self.foreign_text.append(data.strip()[:40])
 
 
 def check_file(path: Path) -> list[str]:
@@ -70,7 +88,10 @@ def check_file(path: Path) -> list[str]:
     parser.feed(source)
     print(f"検査対象: {path}  ({len(source)} 文字)")
 
-    check(parser.lang == "ja", "html 要素に lang='ja' がある")
+    check(parser.lang in ("ja", "en"), "html 要素に lang='ja' か 'en' がある")
+    if parser.lang == "en":
+        check(not parser.foreign_text,
+              f"英語の文書に日本語が残っていない（{parser.foreign_text[:3]}）")
     check(not parser.unbalanced,
           f"閉じタグの不整合がない（{parser.unbalanced[:5]}）")
     check(not parser.stack, f"閉じ忘れがない（{parser.stack[:5]}）")

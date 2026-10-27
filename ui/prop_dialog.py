@@ -21,26 +21,29 @@ import speech
 from core import (
     commands, filters, ordering, props, scenes, speech_format, tracks,
     volume)
+from core.i18n import tr
 
 AUDIO_WILDCARD = (
-    "音声ファイル|*.mp3;*.wav;*.ogg;*.flac;*.m4a;*.aac;*.opus"
-    "|動画ファイル|*.mp4;*.mkv;*.mov;*.webm;*.avi"
-    "|すべてのファイル|*.*")
+    tr("音声ファイル|*.mp3;*.wav;*.ogg;*.flac;*.m4a;*.aac;*.opus"
+       "|動画ファイル|*.mp4;*.mkv;*.mov;*.webm;*.avi"
+       "|すべてのファイル|*.*",
+       "Audio files|*.mp3;*.wav;*.ogg;*.flac;*.m4a;*.aac;*.opus|Video files|*.mp4;*.mkv;*.mov;*.webm;*.avi|All files|*.*"))
 IMAGE_WILDCARD = (
-    "画像ファイル|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp"
-    "|すべてのファイル|*.*")
+    tr("画像ファイル|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp"
+       "|すべてのファイル|*.*",
+       "Image files|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp|All files|*.*"))
 
 # 種類 → (ダイアログの見出し, ワイルドカード)
 FILE_KINDS = {
-    "audio": ("音楽や動画のファイルを選んでください", AUDIO_WILDCARD),
-    "image": ("画像ファイルを選んでください", IMAGE_WILDCARD),
+    "audio": (tr("音楽や動画のファイルを選んでください", "Choose a music or video file"), AUDIO_WILDCARD),
+    "image": (tr("画像ファイルを選んでください", "Choose an image file"), IMAGE_WILDCARD),
 }
 
 # メディアソースに足す操作行（設定値ではなく動作）
 _MEDIA_ROWS = [
-    ("再生・一時停止", ""),           # 状態を見て決めるので action は実行時に決定
-    ("停止", props.MEDIA_STOP),
-    ("最初から", props.MEDIA_RESTART),
+    (tr("再生・一時停止", "Play or pause"), ""),           # 状態を見て決めるので action は実行時に決定
+    (tr("停止", "Stop"), props.MEDIA_STOP),
+    (tr("最初から", "Restart"), props.MEDIA_RESTART),
 ]
 
 
@@ -48,7 +51,7 @@ class SourcePropDialog(wx.Dialog):
     """選択中ソースの設定を一覧・変更するダイアログ。"""
 
     def __init__(self, frame, source_name: str, kind: str) -> None:
-        super().__init__(frame, title=f"{source_name} の設定")
+        super().__init__(frame, title=tr(f"{source_name} の設定", f"{source_name} settings"))
         self.frame = frame
         self.source_name = source_name
         self.kind = kind
@@ -131,7 +134,7 @@ class SourcePropDialog(wx.Dialog):
         if (not self.specs and not self.monitor_type
                 and self.input_tracks is None):
             self._rows.append(("none",))
-            labels.append("このソースの設定は、このアプリでは変えられません")
+            labels.append(tr("このソースの設定は、このアプリでは変えられません", "The settings of this source cannot be changed in this app"))
             return labels
         # 音声を持つ入力なら、まずモニタリングを出す。
         # 「入れたのに聞こえない」の原因はたいていここなので上に置く。
@@ -152,7 +155,7 @@ class SourcePropDialog(wx.Dialog):
                     labels.append(label)
                 else:
                     state = speech_format.media_state_jp(self.media_state)
-                    labels.append(f"{label}、今は {state}")
+                    labels.append(tr(f"{label}、今は {state}", f"{label}, now {state}"))
         # 録画の音声トラック。1行1トラックで、Enter で入り切りする
         # （OBS 本体の「オーディオの詳細プロパティ」のチェックの表に当たる。
         #   表はスクリーンリーダーで扱いにくいので、オン・オフの行に並べ直した）
@@ -195,22 +198,22 @@ class SourcePropDialog(wx.Dialog):
     # ------------------------------------------------------------
     def _build_ui(self) -> None:
         panel = wx.Panel(self)
-        panel.SetName("設定パネル")
+        panel.SetName(tr("設定パネル", "Settings panel"))
         panel.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
         root = wx.BoxSizer(wx.VERTICAL)
 
-        lbl = wx.StaticText(panel, label="設定項目（Enterで変更）")
+        lbl = wx.StaticText(panel, label=tr("設定項目（Enterで変更）", "Settings (Enter to change)"))
         self.prop_list = wx.ListBox(panel, size=(-1, 260))
-        self.prop_list.SetName("設定項目")
+        self.prop_list.SetName(tr("設定項目", "Settings"))
         root.Add(lbl, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.prop_list, 1, wx.EXPAND | wx.ALL, 8)
 
         row = wx.BoxSizer(wx.HORIZONTAL)
-        self.btn_reload = self._button(panel, "読み直す", self.on_reload)
+        self.btn_reload = self._button(panel, tr("読み直す", "Reload"), self.on_reload)
         self.btn_obs = self._button(
-            panel, "OBSのプロパティ画面を開く", self.on_open_obs)
-        self.btn_close = wx.Button(panel, wx.ID_CANCEL, "閉じる")
-        self.btn_close.SetName("閉じる")
+            panel, tr("OBSのプロパティ画面を開く", "Open OBS properties"), self.on_open_obs)
+        self.btn_close = wx.Button(panel, wx.ID_CANCEL, tr("閉じる", "Close"))
+        self.btn_close.SetName(tr("閉じる", "Close"))
         for btn in (self.btn_reload, self.btn_obs, self.btn_close):
             row.Add(btn, 0, wx.ALL, 4)
         root.Add(row, 0, wx.LEFT, 4)
@@ -269,18 +272,18 @@ class SourcePropDialog(wx.Dialog):
 
     def _toggle_bool(self, spec) -> None:
         new_value = not bool(self.settings.get(spec.key))
-        text = "オン" if new_value else "オフ"
+        text = tr("オン", "on") if new_value else tr("オフ", "off")
         self._apply({spec.key: new_value}, [(spec.label, text)])
 
     def _choose_list(self, spec) -> None:
-        speech.speak(f"{spec.label}の候補を読み込みます", interrupt=True)
+        speech.speak(tr(f"{spec.label}の候補を読み込みます", f"Loading choices for {spec.label}"), interrupt=True)
         items = commands.fetch_property_items(
             self.frame.conn.req, self.source_name, spec.key)
         items = props.dedupe_items(items)
         if spec.running_flag:
             items = props.sort_window_items(items)
         if not items:
-            speech.warn(f"{spec.label} の候補が取得できません")
+            speech.warn(tr(f"{spec.label} の候補が取得できません", f"Could not get the choices for {spec.label}"))
             return
         if spec.key in ("device_id", "video_device_id"):
             rows = [speech_format.device_item_label(
@@ -299,7 +302,7 @@ class SourcePropDialog(wx.Dialog):
         sel = props.index_of_value(items, current)
         with self.frame.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"{spec.label}、{len(rows)}件", spec.label, rows)
+                self, tr(f"{spec.label}、{len(rows)}件", f"{spec.label}, {len(rows)} items"), spec.label, rows)
             try:
                 if sel >= 0:
                     dlg.SetSelection(sel)
@@ -324,9 +327,10 @@ class SourcePropDialog(wx.Dialog):
 
     def _enter_int(self, spec) -> None:
         current = self.settings.get(spec.key, spec.min_value)
-        message = (f"{spec.label}を数値で入力してください。\n"
-                   f"今は {current}{spec.unit} です。\n"
-                   f"{spec.min_value} から {spec.max_value} まで。")
+        message = (tr(f"{spec.label}を数値で入力してください。\n"
+                      f"今は {current}{spec.unit} です。\n"
+                      f"{spec.min_value} から {spec.max_value} まで。",
+           f"Enter {spec.label} as a number.\nIt is {current}{spec.unit} now.\nFrom {spec.min_value} to {spec.max_value}."))
         with self.frame.modal():
             dlg = wx.TextEntryDialog(
                 self, message, spec.label, value=str(current))
@@ -340,11 +344,11 @@ class SourcePropDialog(wx.Dialog):
         try:
             value = int(str(text).strip())
         except (TypeError, ValueError):
-            speech.error("数値として読み取れませんでした")
+            speech.error(tr("数値として読み取れませんでした", "Could not read that as a number"))
             return
         if not (spec.min_value <= value <= spec.max_value):
             speech.error(
-                f"{spec.min_value} から {spec.max_value} までで入力してください")
+                tr(f"{spec.min_value} から {spec.max_value} までで入力してください", f"Enter a value from {spec.min_value} to {spec.max_value}"))
             return
         self._apply({spec.key: value}, [(spec.label, f"{value}{spec.unit}")])
 
@@ -354,7 +358,7 @@ class SourcePropDialog(wx.Dialog):
         # あるので、選んでも選ばなくても必ずリストへ戻す
         self.focus_list()
         if not path:
-            speech.speak("ファイルを選びませんでした", interrupt=True)
+            speech.speak(tr("ファイルを選びませんでした", "No file was chosen"), interrupt=True)
             return
         patch = {spec.key: path}
         # メディアソースだけは「ローカルファイルを使う」印が要る。
@@ -366,9 +370,10 @@ class SourcePropDialog(wx.Dialog):
     def _enter_text(self, spec) -> None:
         """自由入力の項目（テキストの本文、ブラウザのアドレス）。"""
         current = str(self.settings.get(spec.key, "") or "")
-        shown = current if current else "（空）"
-        message = (f"{spec.label}を入力してください。\n"
-                   f"今は {shown} です。")
+        shown = current if current else tr("（空）", "(empty)")
+        message = (tr(f"{spec.label}を入力してください。\n"
+                      f"今は {shown} です。",
+           f"Enter {spec.label}.\nIt is {shown} now."))
         with self.frame.modal():
             dlg = wx.TextEntryDialog(
                 self, message, spec.label, value=current)
@@ -380,9 +385,9 @@ class SourcePropDialog(wx.Dialog):
                 dlg.Destroy()
                 self.focus_list()
         if text == current:
-            speech.speak("変更はありません", interrupt=True)
+            speech.speak(tr("変更はありません", "No changes"), interrupt=True)
             return
-        self._apply({spec.key: text}, [(spec.label, text or "空")])
+        self._apply({spec.key: text}, [(spec.label, text or tr("空", "empty"))])
 
     def _choose_fixed(self, spec) -> None:
         """種別の表が持つ選択肢から選ぶ（OBSから引けない項目。色など）。"""
@@ -392,7 +397,7 @@ class SourcePropDialog(wx.Dialog):
         sel = values.index(current) if current in values else 0
         with self.frame.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"{spec.label}、{len(rows)}件", spec.label, rows)
+                self, tr(f"{spec.label}、{len(rows)}件", f"{spec.label}, {len(rows)} items"), spec.label, rows)
             try:
                 dlg.SetSelection(sel)
                 # ★キャンセルでも GetSelection は値を返すので必ず判定する
@@ -424,7 +429,7 @@ class SourcePropDialog(wx.Dialog):
             sel = 0
         with self.frame.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"{props.MONITOR_SPEC.label}、{len(rows)}件",
+                self, tr(f"{props.MONITOR_SPEC.label}、{len(rows)}件", f"{props.MONITOR_SPEC.label}, {len(rows)} items"),
                 props.MONITOR_SPEC.label, rows)
             try:
                 dlg.SetSelection(sel)
@@ -438,7 +443,7 @@ class SourcePropDialog(wx.Dialog):
             return
         chosen = choices[idx]
         if chosen == self.monitor_type:
-            speech.speak("変更はありません", interrupt=True)
+            speech.speak(tr("変更はありません", "No changes"), interrupt=True)
             return
         ok = self.frame.apply_monitor_change(self.source_name, chosen)
         if ok:
@@ -457,7 +462,7 @@ class SourcePropDialog(wx.Dialog):
             commands.trigger_media_action(
                 self.frame.conn.req, self.source_name, action)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"操作に失敗しました（{exc}）")
+            speech.error(tr(f"操作に失敗しました（{exc}）", f"The operation failed ({exc})"))
             return
         # 読み上げはメディアイベント側で行う（一方通行の原則）。
         # 行ラベル「再生・一時停止、今は〜」は古くなるので、OBS側の反映を
@@ -476,7 +481,7 @@ class SourcePropDialog(wx.Dialog):
     # ボタン・キー
     # ------------------------------------------------------------
     def on_reload(self, _evt) -> None:
-        speech.speak("設定を読み直します", interrupt=True)
+        speech.speak(tr("設定を読み直します", "Reloading the settings"), interrupt=True)
         self._load_state()
         self._refresh_list()
 
@@ -485,11 +490,12 @@ class SourcePropDialog(wx.Dialog):
             commands.open_properties_dialog(
                 self.frame.conn.req, self.source_name)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"OBSのプロパティ画面を開けませんでした（{exc}）")
+            speech.error(tr(f"OBSのプロパティ画面を開けませんでした（{exc}）", f"Could not open the OBS properties window ({exc})"))
             return
         speech.speak(
-            "OBSのプロパティ画面を開きました。"
-            "OBSの画面に切り替えて、閉じてください", interrupt=True)
+            tr("OBSのプロパティ画面を開きました。"
+               "OBSの画面に切り替えて、閉じてください",
+               "Opened the OBS properties window. Switch to OBS and close it when done"), interrupt=True)
         self.EndModal(wx.ID_CANCEL)
 
     def on_char_hook(self, evt: wx.KeyEvent) -> None:
@@ -514,7 +520,7 @@ class FilterPropDialog(wx.Dialog):
     """
 
     def __init__(self, frame, source_name: str, filter_name: str) -> None:
-        super().__init__(frame, title=f"{filter_name} の設定")
+        super().__init__(frame, title=tr(f"{filter_name} の設定", f"{filter_name} settings"))
         self.frame = frame
         self.source_name = source_name
         self.filter_name = filter_name
@@ -568,21 +574,21 @@ class FilterPropDialog(wx.Dialog):
 
     def _build_ui(self) -> None:
         panel = wx.Panel(self)
-        panel.SetName("フィルター設定パネル")
+        panel.SetName(tr("フィルター設定パネル", "Filter settings panel"))
         panel.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
         root = wx.BoxSizer(wx.VERTICAL)
 
-        lbl = wx.StaticText(panel, label="設定項目（Enterで変更）")
+        lbl = wx.StaticText(panel, label=tr("設定項目（Enterで変更）", "Settings (Enter to change)"))
         self.prop_list = wx.ListBox(panel, size=(-1, 240))
-        self.prop_list.SetName("設定項目")
+        self.prop_list.SetName(tr("設定項目", "Settings"))
         root.Add(lbl, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.prop_list, 1, wx.EXPAND | wx.ALL, 8)
 
         row = wx.BoxSizer(wx.HORIZONTAL)
-        self.btn_reset = self._button(panel, "既定値に戻す", self.on_reset)
-        self.btn_reload = self._button(panel, "読み直す", self.on_reload)
-        self.btn_close = wx.Button(panel, wx.ID_CANCEL, "閉じる")
-        self.btn_close.SetName("閉じる")
+        self.btn_reset = self._button(panel, tr("既定値に戻す", "Reset to defaults"), self.on_reset)
+        self.btn_reload = self._button(panel, tr("読み直す", "Reload"), self.on_reload)
+        self.btn_close = wx.Button(panel, wx.ID_CANCEL, tr("閉じる", "Close"))
+        self.btn_close.SetName(tr("閉じる", "Close"))
         for btn in (self.btn_reset, self.btn_reload, self.btn_close):
             row.Add(btn, 0, wx.ALL, 4)
         root.Add(row, 0, wx.LEFT, 4)
@@ -627,10 +633,11 @@ class FilterPropDialog(wx.Dialog):
     def _enter_number(self, spec) -> None:
         current = self.settings.get(spec.key, spec.min_value)
         message = (
-            f"{spec.label}を数値で入力してください。\n"
-            f"今は {speech_format.fmt_filter_value(spec, current)} です。\n"
-            f"入力できる範囲は {_fmt_limit(spec.min_value)} から "
-            f"{_fmt_limit(spec.max_value)} までです。")
+            tr(f"{spec.label}を数値で入力してください。\n"
+               f"今は {speech_format.fmt_filter_value(spec, current)} です。\n"
+               f"入力できる範囲は {_fmt_limit(spec.min_value)} から "
+               f"{_fmt_limit(spec.max_value)} までです。",
+               f"Enter {spec.label} as a number.\nIt is {speech_format.fmt_filter_value(spec, current)} now.\nYou can enter from {_fmt_limit(spec.min_value)} to {_fmt_limit(spec.max_value)}."))
         with self.frame.modal():
             dlg = wx.TextEntryDialog(
                 self, message, spec.label, value=_fmt_limit(current))
@@ -645,8 +652,9 @@ class FilterPropDialog(wx.Dialog):
         parsed = volume.parse_db_input(text)
         if parsed is None:
             speech.error(
-                "数値として読み取れませんでした。5 や マイナス10 のように"
-                "入力してください")
+                tr("数値として読み取れませんでした。5 や マイナス10 のように"
+                   "入力してください",
+                   "Could not read that as a number. Enter something like 5 or -10"))
             return
         # 範囲外は拒否せず端へ丸める（打ち間違いで弾かれるより親切。
         # 音量の parse_db_input と同じ方針）
@@ -659,7 +667,7 @@ class FilterPropDialog(wx.Dialog):
         sel = values.index(current) if current in values else 0
         with self.frame.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"{spec.label}、{len(rows)}件", spec.label, rows)
+                self, tr(f"{spec.label}、{len(rows)}件", f"{spec.label}, {len(rows)} items"), spec.label, rows)
             try:
                 dlg.SetSelection(sel)
                 # ★キャンセルでも GetSelection は値を返すので必ず判定する
@@ -676,14 +684,14 @@ class FilterPropDialog(wx.Dialog):
         """サイドチェーンの元になる音声入力を選ぶ。"""
         names = [i.name for i in self.frame.snapshot.audio_inputs
                  if i.name != self.source_name]
-        rows = ["なし"] + names
+        rows = [tr("なし", "none")] + names
         values = [filters.SIDECHAIN_NONE] + names
         current = str(self.settings.get(spec.key, "") or
                       filters.SIDECHAIN_NONE)
         sel = values.index(current) if current in values else 0
         with self.frame.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"{spec.label}、{len(rows)}件", spec.label, rows)
+                self, tr(f"{spec.label}、{len(rows)}件", f"{spec.label}, {len(rows)} items"), spec.label, rows)
             try:
                 dlg.SetSelection(sel)
                 if dlg.ShowModal() != wx.ID_OK:
@@ -707,10 +715,10 @@ class FilterPropDialog(wx.Dialog):
         defaults = commands.fetch_filter_default_settings(
             self.frame.conn.req, self.kind)
         if not defaults:
-            speech.warn("このフィルターに既定値はありません")
+            speech.warn(tr("このフィルターに既定値はありません", "This filter has no default values"))
             return
         if not self.frame._confirm(
-            f"{self.filter_name} の設定を既定値に戻しますか？"
+            tr(f"{self.filter_name} の設定を既定値に戻しますか？", f"Reset the settings of {self.filter_name} to defaults?")
         ):
             return
         ok = self.frame.apply_filter_change(
@@ -718,11 +726,11 @@ class FilterPropDialog(wx.Dialog):
         if ok:
             self._load_state()
             self._refresh_list()
-            speech.speak(f"{self.filter_name} を既定値に戻しました",
+            speech.speak(tr(f"{self.filter_name} を既定値に戻しました", f"Reset {self.filter_name} to defaults"),
                          interrupt=True)
 
     def on_reload(self, _evt) -> None:
-        speech.speak("設定を読み直します", interrupt=True)
+        speech.speak(tr("設定を読み直します", "Reloading the settings"), interrupt=True)
         self._load_state()
         self._refresh_list()
 
@@ -747,7 +755,7 @@ class ScenePropDialog(wx.Dialog):
     """
 
     def __init__(self, frame, scene_name: str) -> None:
-        super().__init__(frame, title=f"{scene_name} の設定")
+        super().__init__(frame, title=tr(f"{scene_name} の設定", f"{scene_name} settings"))
         self.frame = frame
         self.scene_name = scene_name
         self.transitions: list = []
@@ -783,7 +791,7 @@ class ScenePropDialog(wx.Dialog):
         labels: list[str] = []
 
         self._rows.append(("name",))
-        labels.append(speech_format.prop_row_label("名前", self.scene_name))
+        labels.append(speech_format.prop_row_label(tr("名前", "Name"), self.scene_name))
 
         self._rows.append(("transition",))
         labels.append(speech_format.scene_transition_row(self.current))
@@ -796,7 +804,7 @@ class ScenePropDialog(wx.Dialog):
             labels.append(speech_format.scene_duration_row(self.current))
 
         self._rows.append(("add_source",))
-        labels.append("このシーンにソースを追加する")
+        labels.append(tr("このシーンにソースを追加する", "Add a source to this scene"))
         return labels
 
     def _refresh_list(self, keep_selection: bool = True) -> None:
@@ -808,20 +816,20 @@ class ScenePropDialog(wx.Dialog):
 
     def _build_ui(self) -> None:
         panel = wx.Panel(self)
-        panel.SetName("シーン設定パネル")
+        panel.SetName(tr("シーン設定パネル", "Scene settings panel"))
         panel.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
         root = wx.BoxSizer(wx.VERTICAL)
 
-        lbl = wx.StaticText(panel, label="設定項目（Enterで変更）")
+        lbl = wx.StaticText(panel, label=tr("設定項目（Enterで変更）", "Settings (Enter to change)"))
         self.prop_list = wx.ListBox(panel, size=(-1, 200))
-        self.prop_list.SetName("設定項目")
+        self.prop_list.SetName(tr("設定項目", "Settings"))
         root.Add(lbl, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.prop_list, 1, wx.EXPAND | wx.ALL, 8)
 
         row = wx.BoxSizer(wx.HORIZONTAL)
-        self.btn_reload = self._button(panel, "読み直す", self.on_reload)
-        self.btn_close = wx.Button(panel, wx.ID_CANCEL, "閉じる")
-        self.btn_close.SetName("閉じる")
+        self.btn_reload = self._button(panel, tr("読み直す", "Reload"), self.on_reload)
+        self.btn_close = wx.Button(panel, wx.ID_CANCEL, tr("閉じる", "Close"))
+        self.btn_close.SetName(tr("閉じる", "Close"))
         for btn in (self.btn_reload, self.btn_close):
             row.Add(btn, 0, wx.ALL, 4)
         root.Add(row, 0, wx.LEFT, 4)
@@ -852,7 +860,7 @@ class ScenePropDialog(wx.Dialog):
     def _rename(self) -> None:
         with self.frame.modal():
             dlg = wx.TextEntryDialog(
-                self, "シーンの名前を入力してください。", "名前の変更",
+                self, tr("シーンの名前を入力してください。", "Enter the name of the scene."), tr("名前の変更", "Rename"),
                 value=self.scene_name)
             try:
                 if dlg.ShowModal() != wx.ID_OK:
@@ -863,32 +871,32 @@ class ScenePropDialog(wx.Dialog):
                 self.focus_list()
         new_name = scenes.valid_scene_name(typed)
         if not new_name or new_name == self.scene_name:
-            speech.speak("変更はありません", interrupt=True)
+            speech.speak(tr("変更はありません", "No changes"), interrupt=True)
             return
         existing = commands.fetch_scene_names(self.frame.conn.req)
         if new_name in existing:
-            speech.warn(f"{new_name} という名前のシーンが既にあります")
+            speech.warn(tr(f"{new_name} という名前のシーンが既にあります", f"A scene named {new_name} already exists"))
             return
         old = self.scene_name
         try:
             commands.rename_scene(self.frame.conn.req, old, new_name)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"名前を変えられませんでした（{exc}）")
+            speech.error(tr(f"名前を変えられませんでした（{exc}）", f"Could not rename ({exc})"))
             return
         self.scene_name = new_name
-        self.SetTitle(f"{new_name} の設定")
+        self.SetTitle(tr(f"{new_name} の設定", f"{new_name} settings"))
         self._refresh_list()
         speech.speak(
             speech_format.scene_renamed_speech(old, new_name), interrupt=True)
 
     def _choose_transition(self) -> None:
-        rows = ["全体の設定に従う"] + [t.name for t in self.transitions]
+        rows = [tr("全体の設定に従う", "follow the global setting")] + [t.name for t in self.transitions]
         values = [scenes.USE_GLOBAL] + [t.name for t in self.transitions]
         sel = (values.index(self.current.name)
                if self.current.name in values else 0)
         with self.frame.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"切り替え効果、{len(rows)}件", "切り替え効果", rows)
+                self, tr(f"切り替え効果、{len(rows)}件", f"Transition, {len(rows)} items"), tr("切り替え効果", "Transition"), rows)
             try:
                 dlg.SetSelection(sel)
                 # ★キャンセルでも GetSelection は値を返すので必ず判定する
@@ -911,13 +919,14 @@ class ScenePropDialog(wx.Dialog):
 
     def _enter_duration(self) -> None:
         current = self.current.duration_ms or scenes.DEFAULT_DURATION_MS
-        message = (f"切り替えの長さをミリ秒で入力してください。\n"
-                   f"今は {int(current)}ミリ秒 です。\n"
-                   f"{scenes.DURATION_MIN_MS} から "
-                   f"{scenes.DURATION_MAX_MS} まで。")
+        message = (tr(f"切り替えの長さをミリ秒で入力してください。\n"
+                      f"今は {int(current)}ミリ秒 です。\n"
+                      f"{scenes.DURATION_MIN_MS} から "
+                      f"{scenes.DURATION_MAX_MS} まで。",
+           f"Enter the transition duration in milliseconds.\nIt is {int(current)} milliseconds now.\nFrom {scenes.DURATION_MIN_MS} to {scenes.DURATION_MAX_MS}."))
         with self.frame.modal():
             dlg = wx.TextEntryDialog(
-                self, message, "切り替えの長さ", value=str(int(current)))
+                self, message, tr("切り替えの長さ", "Transition duration"), value=str(int(current)))
             try:
                 if dlg.ShowModal() != wx.ID_OK:
                     return
@@ -928,7 +937,7 @@ class ScenePropDialog(wx.Dialog):
         try:
             value = int(str(text).strip())
         except (TypeError, ValueError):
-            speech.error("数値として読み取れませんでした")
+            speech.error(tr("数値として読み取れませんでした", "Could not read that as a number"))
             return
         # 範囲外は拒否せず端へ丸める（音量の数値入力と同じ方針）
         self._apply_transition(
@@ -940,7 +949,7 @@ class ScenePropDialog(wx.Dialog):
             commands.apply_scene_transition(
                 self.frame.conn.req, self.scene_name, name, duration)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"切り替え効果を変えられませんでした（{exc}）")
+            speech.error(tr(f"切り替え効果を変えられませんでした（{exc}）", f"Could not change the transition ({exc})"))
             return
         # イベントが無いので読み直して確かめる
         self.current = commands.fetch_scene_transition(
@@ -948,8 +957,9 @@ class ScenePropDialog(wx.Dialog):
         self._refresh_list()
         if self.current.name != (name or scenes.USE_GLOBAL):
             speech.warn(
-                f"{self.scene_name} の切り替え効果は変わりませんでした。"
-                "OBSが受け付けていません")
+                tr(f"{self.scene_name} の切り替え効果は変わりませんでした。"
+                   "OBSが受け付けていません",
+                   f"The transition of {self.scene_name} did not change. OBS did not accept it"))
             return
         speech.speak(
             speech_format.scene_transition_changed_speech(
@@ -973,8 +983,8 @@ class ScenePropDialog(wx.Dialog):
             return
         with self.frame.modal():
             dlg = wx.SingleChoiceDialog(
-                self, f"{self.scene_name} に追加するソース、{len(names)}件",
-                "ソースを追加", names)
+                self, tr(f"{self.scene_name} に追加するソース、{len(names)}件", f"{len(names)} sources you can add to {self.scene_name}"),
+                tr("ソースを追加", "Add source"), names)
             try:
                 if dlg.ShowModal() != wx.ID_OK:
                     return
@@ -988,14 +998,14 @@ class ScenePropDialog(wx.Dialog):
         try:
             commands.add_source_to_scene(client, self.scene_name, source)
         except Exception as exc:  # noqa: BLE001
-            speech.error(f"ソースを追加できませんでした（{exc}）")
+            speech.error(tr(f"ソースを追加できませんでした（{exc}）", f"Could not add the source ({exc})"))
             return
         speech.speak(
             speech_format.scene_source_added_speech(self.scene_name, source),
             interrupt=True)
 
     def on_reload(self, _evt) -> None:
-        speech.speak("設定を読み直します", interrupt=True)
+        speech.speak(tr("設定を読み直します", "Reloading the settings"), interrupt=True)
         self._load_state()
         self._refresh_list()
 
@@ -1022,25 +1032,25 @@ class KeyHelpDialog(wx.Dialog):
     """
 
     def __init__(self, frame, text: str) -> None:
-        super().__init__(frame, title="キー操作の一覧")
+        super().__init__(frame, title=tr("キー操作の一覧", "Key list"))
         self.frame = frame
         panel = wx.Panel(self)
-        panel.SetName("キー一覧パネル")
+        panel.SetName(tr("キー一覧パネル", "Key list panel"))
         panel.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
         root = wx.BoxSizer(wx.VERTICAL)
 
         lbl = wx.StaticText(
-            panel, label="キー操作の一覧（上下キーで1行ずつ読めます）")
+            panel, label=tr("キー操作の一覧（上下キーで1行ずつ読めます）", "Key list (read one line at a time with Up and Down Arrow)"))
         self.text = wx.TextCtrl(
             panel, value=text,
             style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_DONTWRAP)
-        self.text.SetName("キー操作の一覧")
+        self.text.SetName(tr("キー操作の一覧", "Key list"))
         root.Add(lbl, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.text, 1, wx.EXPAND | wx.ALL, 8)
 
         row = wx.BoxSizer(wx.HORIZONTAL)
-        self.btn_close = wx.Button(panel, wx.ID_CANCEL, "閉じる")
-        self.btn_close.SetName("閉じる")
+        self.btn_close = wx.Button(panel, wx.ID_CANCEL, tr("閉じる", "Close"))
+        self.btn_close.SetName(tr("閉じる", "Close"))
         row.Add(self.btn_close, 0, wx.ALL, 4)
         root.Add(row, 0, wx.LEFT, 4)
 
@@ -1091,10 +1101,10 @@ class OrderDialog(wx.Dialog):
       （保存済みの並びを先に、そこに無い入力だけを名前順で後ろへ足す）。
     """
 
-    MISSING_MARK = "（今はありません）"
+    MISSING_MARK = tr("（今はありません）", " (not present now)")
 
     def __init__(self, frame, title, names, saved_order,
-                 by_name: bool = False, what: str = "並べる順番",
+                 by_name: bool = False, what: str = tr("並べる順番", "Order"),
                  present=None) -> None:
         super().__init__(frame, title=title)
         self.frame = frame
@@ -1128,37 +1138,38 @@ class OrderDialog(wx.Dialog):
     @property
     def reset_label(self) -> str:
         """並べ直しボタンの文言（戻す先を名前で言う）。"""
-        return "名前順に並べ直す" if self.by_name else "OBSと同じ順に戻す"
+        return tr("名前順に並べ直す", "Re-sort by name") if self.by_name else tr("OBSと同じ順に戻す", "Reset to the same order as OBS")
 
     def _build_ui(self) -> None:
         panel = wx.Panel(self)
-        panel.SetName("並び順パネル")
+        panel.SetName(tr("並び順パネル", "Order panel"))
         panel.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
         root = wx.BoxSizer(wx.VERTICAL)
 
         lbl = wx.StaticText(
             panel,
-            label=f"{self.what}（Altと上下キーで入れ替え、"
-                  "Deleteで一覧から外す）")
+            label=tr(f"{self.what}（Altと上下キーで入れ替え、"
+                     "Deleteで一覧から外す）",
+               f"{self.what} (Alt+Up and Down Arrow to move, Delete to remove from the list)"))
         self.order_list = wx.ListBox(panel, size=(-1, 200))
         self.order_list.SetName(self.what)
         root.Add(lbl, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.order_list, 1, wx.EXPAND | wx.ALL, 8)
 
         row = wx.BoxSizer(wx.HORIZONTAL)
-        self.btn_up = self._button(panel, "上へ移動", self.on_up)
-        self.btn_down = self._button(panel, "下へ移動", self.on_down)
+        self.btn_up = self._button(panel, tr("上へ移動", "Move up"), self.on_up)
+        self.btn_down = self._button(panel, tr("下へ移動", "Move down"), self.on_down)
         self.btn_sort = self._button(panel, self.reset_label, self.on_sort)
-        self.btn_drop = self._button(panel, "一覧から外す", self.on_drop)
+        self.btn_drop = self._button(panel, tr("一覧から外す", "Remove from list"), self.on_drop)
         # ★OK・キャンセルは EndModal を直接呼ぶ
         #   （ストックIDの既定処理任せにすると、閉じ方が環境依存になる）
-        self.btn_ok = wx.Button(panel, wx.ID_OK, "保存")
-        self.btn_ok.SetName("保存")
+        self.btn_ok = wx.Button(panel, wx.ID_OK, tr("保存", "Save"))
+        self.btn_ok.SetName(tr("保存", "Save"))
         self.btn_ok.SetDefault()
         self.btn_ok.Bind(wx.EVT_BUTTON,
                          lambda _evt: self.EndModal(wx.ID_OK))
-        self.btn_cancel = wx.Button(panel, wx.ID_CANCEL, "キャンセル")
-        self.btn_cancel.SetName("キャンセル")
+        self.btn_cancel = wx.Button(panel, wx.ID_CANCEL, tr("キャンセル", "Cancel"))
+        self.btn_cancel.SetName(tr("キャンセル", "Cancel"))
         self.btn_cancel.Bind(wx.EVT_BUTTON,
                              lambda _evt: self.EndModal(wx.ID_CANCEL))
         for btn in (self.btn_up, self.btn_down, self.btn_sort,
@@ -1196,7 +1207,7 @@ class OrderDialog(wx.Dialog):
         """
         name = self.rows[idx]
         mark = "" if name in self.present else self.MISSING_MARK
-        return f"{name}{mark} {idx + 1}番目"
+        return tr(f"{name}{mark} {idx + 1}番目", f"{name}{mark}, number {idx + 1}")
 
     def _refresh(self, select: int) -> None:
         labels = [self._row_label(i) for i in range(len(self.rows))]
@@ -1209,13 +1220,13 @@ class OrderDialog(wx.Dialog):
     def _move(self, delta: int) -> None:
         idx = self.order_list.GetSelection()
         if idx == wx.NOT_FOUND:
-            speech.warn("動かすものを選んでください")
+            speech.warn(tr("動かすものを選んでください", "Select the item to move"))
             return
         new = ordering.move(self.rows, idx, delta)
         if new < 0:
             speech.speak(
-                "これ以上、上へは動かせません" if delta < 0
-                else "これ以上、下へは動かせません", interrupt=True)
+                tr("これ以上、上へは動かせません", "Cannot move up any further") if delta < 0
+                else tr("これ以上、下へは動かせません", "Cannot move down any further"), interrupt=True)
             return
         # ★読み上げはリストを作り直す前に呼ぶ
         #   （あとにすると、選択が動いたことによる
@@ -1232,11 +1243,12 @@ class OrderDialog(wx.Dialog):
         if name in self.present:
             # 外しても今あるソースは名前順の後ろへ回るだけで消えない。
             # 「外れた」と誤解させないよう断る
-            speech.warn(f"{name} は今あるものなので外せません。"
-                        "順番だけ変えられます")
+            speech.warn(tr(f"{name} は今あるものなので外せません。"
+                           "順番だけ変えられます",
+               f"{name} exists now, so it cannot be removed. You can only change its order"))
             return
         del self.rows[idx]
-        speech.speak(f"{name} を一覧から外しました", interrupt=True)
+        speech.speak(tr(f"{name} を一覧から外しました", f"Removed {name} from the list"), interrupt=True)
         self._refresh(min(idx, len(self.rows) - 1))
 
     def _reset_order(self) -> None:
@@ -1333,7 +1345,7 @@ class RecordTracksDialog(wx.Dialog):
     """
 
     def __init__(self, frame) -> None:
-        super().__init__(frame, title="録画のトラック設定")
+        super().__init__(frame, title=tr("録画のトラック設定", "Recording track settings"))
         self.frame = frame
         self.info: dict = {}
         self._load_state()
@@ -1365,8 +1377,8 @@ class RecordTracksDialog(wx.Dialog):
         states = self._states()
         labels = [speech_format.record_track_row(n, states[n - 1])
                   for n in tracks.TRACK_NUMBERS]
-        labels.append("割り当てをまとめて読む")
-        labels.append("おすすめの割り当てを聞く")
+        labels.append(tr("割り当てをまとめて読む", "Read the whole assignment"))
+        labels.append(tr("おすすめの割り当てを聞く", "Hear the recommended assignment"))
         return labels
 
     def _refresh_list(self, keep_selection: bool = True) -> None:
@@ -1377,21 +1389,21 @@ class RecordTracksDialog(wx.Dialog):
 
     def _build_ui(self) -> None:
         panel = wx.Panel(self)
-        panel.SetName("録画のトラック設定パネル")
+        panel.SetName(tr("録画のトラック設定パネル", "Recording track settings panel"))
         panel.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
         root = wx.BoxSizer(wx.VERTICAL)
         lbl = wx.StaticText(
-            panel, label="録画するトラック（Enterで入り切り。次の録画から効く）")
+            panel, label=tr("録画するトラック（Enterで入り切り。次の録画から効く）", "Recorded tracks (Enter to toggle. Takes effect from the next recording)"))
         self.prop_list = wx.ListBox(panel, size=(-1, 200))
-        self.prop_list.SetName("録画するトラック")
+        self.prop_list.SetName(tr("録画するトラック", "Recorded tracks"))
         root.Add(lbl, 0, wx.LEFT | wx.TOP, 8)
         root.Add(self.prop_list, 1, wx.EXPAND | wx.ALL, 8)
         row = wx.BoxSizer(wx.HORIZONTAL)
-        self.btn_reload = wx.Button(panel, label="読み直す")
-        self.btn_reload.SetName("読み直す")
+        self.btn_reload = wx.Button(panel, label=tr("読み直す", "Reload"))
+        self.btn_reload.SetName(tr("読み直す", "Reload"))
         self.btn_reload.Bind(wx.EVT_BUTTON, self.on_reload)
-        self.btn_close = wx.Button(panel, wx.ID_CANCEL, "閉じる")
-        self.btn_close.SetName("閉じる")
+        self.btn_close = wx.Button(panel, wx.ID_CANCEL, tr("閉じる", "Close"))
+        self.btn_close.SetName(tr("閉じる", "Close"))
         for btn in (self.btn_reload, self.btn_close):
             row.Add(btn, 0, wx.ALL, 4)
         root.Add(row, 0, wx.LEFT, 4)
@@ -1416,7 +1428,7 @@ class RecordTracksDialog(wx.Dialog):
                          interrupt=True)
 
     def on_reload(self, _evt) -> None:
-        speech.speak("設定を読み直します", interrupt=True)
+        speech.speak(tr("設定を読み直します", "Reloading the settings"), interrupt=True)
         self._load_state()
         self._refresh_list()
 

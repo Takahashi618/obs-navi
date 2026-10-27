@@ -4,6 +4,10 @@ HTML 側を直して再実行すれば txt が追従するので、二重管理�
 見出しは記号で階層を示し、リストは番号・中黒を残す。table は
 行ごとに「見出し: 値」の形へ展開する（読み上げでセルの対応が
 崩れないようにするため）。
+
+英語の文書（<html lang="en">）は英語向けの記号で書く。■ や ・ は
+英語の声だと記号の名前を読まれるので、見出しは「== 」「-- 」、
+箇条は「- 」、用語は「用語:」、名前の無い列は「Column N」にする。
 """
 
 from __future__ import annotations
@@ -19,6 +23,13 @@ HEADING_PREFIX: dict[str, str] = {
     "h2": "■ ",
     "h3": "◆ ",
     "h4": "・",
+}
+# 英語の文書の記号（言語ごとに違うものだけ）
+SYMBOLS = {
+    "ja": {"h2": "■ ", "h3": "◆ ", "h4": "・", "bullet": "・",
+           "dt_open": "【", "dt_close": "】", "column": "項目{n}"},
+    "en": {"h2": "== ", "h3": "-- ", "h4": "- ", "bullet": "- ",
+           "dt_open": "", "dt_close": ":", "column": "Column {n}"},
 }
 
 BLOCK_TAGS = frozenset(
@@ -49,6 +60,7 @@ class DocumentToText(HTMLParser):
         self._header_cells: list[str] = []
         self._row_cells: list[str] = []
         self._cell_buffer: list[str] | None = None
+        self.sym = SYMBOLS["ja"]
 
     # -- 内部ユーティリティ ------------------------------------------------
 
@@ -74,6 +86,10 @@ class DocumentToText(HTMLParser):
             return
         if self._skip_depth:
             return
+        if tag == "html":
+            lang = (dict(attrs).get("lang") or "ja").lower()
+            self.sym = SYMBOLS["en" if lang.startswith("en") else "ja"]
+            return
         if tag in VOID_TAGS and tag != "br":
             return
 
@@ -89,7 +105,7 @@ class DocumentToText(HTMLParser):
                 self._list_stack[-1] += 1
                 self._pending_prefix = f"{indent}{self._list_stack[-1]}. "
             else:
-                self._pending_prefix = f"{indent}・"
+                self._pending_prefix = f"{indent}{self.sym['bullet']}"
             return
 
         if tag in ("th", "td"):
@@ -109,9 +125,9 @@ class DocumentToText(HTMLParser):
             self._flush()
             if tag in HEADING_PREFIX:
                 self._blank_line()
-                self._pending_prefix = HEADING_PREFIX[tag]
+                self._pending_prefix = self.sym.get(tag, HEADING_PREFIX[tag])
             elif tag == "dt":
-                self._pending_prefix = "【"
+                self._pending_prefix = self.sym["dt_open"]
             elif tag == "dd":
                 self._pending_prefix = "  "
 
@@ -138,11 +154,11 @@ class DocumentToText(HTMLParser):
                     label = (
                         self._header_cells[index]
                         if index < len(self._header_cells)
-                        else f"項目{index + 1}"
+                        else self.sym["column"].format(n=index + 1)
                     )
                     parts.append(f"{label}: {cell}")
                 if parts:
-                    self.lines.append("・" + " / ".join(parts))
+                    self.lines.append(self.sym["bullet"] + " / ".join(parts))
             self._row_cells = []
             self._in_table_header = False
             return
@@ -156,7 +172,7 @@ class DocumentToText(HTMLParser):
             return
 
         if tag == "dt":
-            self._buffer.append("】")
+            self._buffer.append(self.sym["dt_close"])
             self._flush()
             return
 
